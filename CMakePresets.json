@@ -1,0 +1,28 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 18,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "tests",
+      "hidden": false,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/tests",
+      "cacheVariables": {
+        "CSPOT_TARGET_TESTS": "ON",
+        "CSPOT_DISABLE_TESTS": "OFF",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "tests",
+      "configurePreset": "tests",
+      "inheritConfigureEnvironment": true
+    }
+  ]
+}

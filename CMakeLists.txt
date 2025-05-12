@@ -1,8 +1,9 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.10)
 
 # Configurable options
 option(CSPOT_TARGET_CLI "Enable cspotcli target" OFF)
 option(CSPOT_TARGET_ESP32 "Enable cspot-esp32 target" OFF)
+option(CSPOT_TARGET_TESTS "Enable cspot tests target" OFF)
 
 # Enable cspotcli target
 if(CSPOT_TARGET_CLI)
@@ -18,3 +19,7 @@ if(CSPOT_TARGET_ESP32)
     project(cspot-esp32)
 endif()
 
+if(CSPOT_TARGET_TESTS)
+  add_subdirectory(main)
+  project(cspot_tests)
+endif()

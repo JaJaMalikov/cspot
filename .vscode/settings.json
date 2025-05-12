@@ -8,5 +8,6 @@
         "--background-index",
         "--compile-commands-dir=${workspaceFolder}/targets/cli/build"
     ],
-    "editor.tabSize": 2
+    "editor.tabSize": 2,
+    "idf.pythonInstallPath": "/opt/homebrew/opt/python@3.12/Frameworks/Python.framework/Versions/3.12/bin/python3"
 }
