@@ -93,6 +93,15 @@ bool cspot::pbEncodeUint8Vector(pb_ostream_t* stream, const pb_field_t* field,
   return true;
 }
 
+bool cspot::pbDecodeUint8Vector(pb_istream_t* stream, const pb_field_t* field,
+                                void** arg) {
+  auto& vec = *static_cast<std::vector<uint8_t>*>(*arg);
+
+  vec.resize(stream->bytes_left);
+
+  return pb_read(stream, vec.data(), stream->bytes_left);
+}
+
 bell::Result<size_t> cspot::pbEncodeMessage(uint8_t* buffer, size_t size,
                                             const pb_msgdesc_t* messageType,
                                             const void* src) {

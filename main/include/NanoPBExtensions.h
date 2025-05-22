@@ -22,6 +22,10 @@ bool pbDecodeString(pb_istream_t* stream, const pb_field_t* field, void** arg);
 bool pbEncodeUint8Vector(pb_ostream_t* stream, const pb_field_t* field,
                          void* const* arg);
 
+// NanoPB decode callback for std::vector<uint8_t>
+bool pbDecodeUint8Vector(pb_istream_t* stream, const pb_field_t* field, void** arg);
+
+// NanoPB encode callback for std::vector<std::string>
 bool pbEncodeStringVector(pb_ostream_t* stream, const pb_field_t* field,
                           void* const* arg);
 

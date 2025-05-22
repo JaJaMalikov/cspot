@@ -21,6 +21,8 @@ ConnectDeviceState::ConnectDeviceState(
     std::shared_ptr<SessionContext> sessionContext,
     std::shared_ptr<SpClient> spClient)
     : sessionContext(std::move(sessionContext)), spClient(std::move(spClient)) {
+  trackQueue = std::make_shared<TrackQueue>(sessionContext, spClient);
+
   this->initialize();
 }
 
@@ -173,6 +175,8 @@ bell::Result<> ConnectDeviceState::handleTransferCommand(
   }
 
   TransferState transferState = TransferState_init_zero;
+
+  trackQueue->pbAssignDecodeCallbacksForQueue(&transferState.queue);
 
   // Assign the decode functions for the protobuf fields
   transferState.current_session.context.uri.funcs.decode =
