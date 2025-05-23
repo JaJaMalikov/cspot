@@ -22,8 +22,6 @@ file(GLOB SOURCES "src/*.cpp" "src/events/*.cpp" "src/*.c" "src/api/*.cpp" "src/
 if(NOT CSPOT_DISABLE_TESTS)
     enable_testing()
     add_subdirectory("../test" ${CMAKE_CURRENT_BINARY_DIR}/test)
-    find_package(trompeloeil REQUIRED)
-    list(APPEND EXTRA_LIBS trompeloeil::trompeloeil)
 endif()
 
 # Use externally specified bell library or the submodule

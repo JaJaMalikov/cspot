@@ -11,6 +11,36 @@
 #include <pb_common.h>
 
 namespace cspot {
+struct ContextTrack {
+  std::string uri;
+  std::string uid;
+  std::vector<uint8_t> gid;
+};
+
+struct ProvidedTrack {
+  std::string uri;
+  std::string uid;
+  std::string provider;
+};
+
+struct ContextPage {
+  std::string page_url;
+  std::string next_page_url;
+  std::vector<ContextTrack> tracks;
+};
+
+// NanoPB encode callback for std::vector<ProvidedTrack>
+bool pbEncodeProvidedTrackList(pb_ostream_t* stream, const pb_field_t* field,
+                               void* const* arg);
+
+// NanoPB decode callback for std::vector<ContextTrack>
+bool pbDecodeContextTrackList(pb_istream_t* stream, const pb_field_t* /*field*/,
+                              void** arg);
+
+// NanoPB decode callback for std::vector<ContextPage>
+bool pbDecodeContextPageList(pb_istream_t* stream, const pb_field_t* /*field*/,
+                             void** arg);
+
 // NanoPB encode callback for std::string
 bool pbEncodeString(pb_ostream_t* stream, const pb_field_t* field,
                     void* const* arg);
@@ -23,7 +53,8 @@ bool pbEncodeUint8Vector(pb_ostream_t* stream, const pb_field_t* field,
                          void* const* arg);
 
 // NanoPB decode callback for std::vector<uint8_t>
-bool pbDecodeUint8Vector(pb_istream_t* stream, const pb_field_t* field, void** arg);
+bool pbDecodeUint8Vector(pb_istream_t* stream, const pb_field_t* field,
+                         void** arg);
 
 // NanoPB encode callback for std::vector<std::string>
 bool pbEncodeStringVector(pb_ostream_t* stream, const pb_field_t* field,

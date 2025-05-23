@@ -10,12 +10,6 @@
 #include "connect.pb.h"
 
 namespace cspot {
-struct ContextTrack {
-  std::string uri;
-  std::string uid;
-  std::vector<uint8_t> gid;
-  std::unordered_map<std::string, std::string> metadata;
-};
 
 class TrackQueue {
  public:
@@ -23,7 +17,7 @@ class TrackQueue {
              std::shared_ptr<SpClient> spClient);
 
   // Assigns a nanopb decode callback to decode ContextTracks from queue
-  void pbAssignDecodeCallbacksForQueue(Queue* queueProto);
+  void pbAssignDecodeCallbacksForTransfer(TransferState* transferProto);
 
  private:
   const char* LOG_TAG = "TrackQueue";
@@ -31,5 +25,9 @@ class TrackQueue {
   std::shared_ptr<SpClient> spClient;
 
   std::vector<ContextTrack> trackQueue;
+
+  std::vector<ContextPage> contextPages;
+  std::string contextUri;
+  std::string contextUrl;
 };
 }  // namespace cspot

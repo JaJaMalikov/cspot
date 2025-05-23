@@ -20,6 +20,13 @@ class SpClient {
   bell::Result<> putConnectStateInactive(int retryCount = 3);
   bell::Result<> putConnectState(const PutStateRequest& stateRequest,
                                  int retryCount = 3);
+  bell::Result<tao::json::value> contextResolve(const std::string& contextUri);
+
+  bell::Result<tao::json::value> hmRequest(const std::string& request);
+
+  bell::Result<tao::json::value> radioApollo(const std::string& scope,
+                                             const std::string& contextUri,
+                                             bool autoplay, int pageSize);
 
  private:
   const char* LOG_TAG = "SpClient";

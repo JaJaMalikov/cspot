@@ -1,5 +1,6 @@
 #include "ConnectDeviceState.h"
 
+#include <tao/json.hpp>
 #include "NanoPBExtensions.h"
 #include "SessionContext.h"
 #include "api/SpClient.h"
@@ -93,12 +94,13 @@ void ConnectDeviceState::initialize() {
   capabilities.connect_capabilities.arg =
       &connectCapabilities;  // TODO: Set to actual capabilities
 
-  auto& playerState = stateRequestProto.device.player_state;
+  // auto& playerState = stateRequestProto.device.player_state;
 
-  playerState.context_uri.funcs.encode = &cspot::pbEncodeString;
-  playerState.context_uri.arg = &this->playerContextUri;
-  playerState.context_url.funcs.encode = &cspot::pbEncodeString;
-  playerState.context_url.arg = &this->playerContextUrl;
+  // playerState.context_uri.funcs.encode = &cspot::pbEncodeString;
+  // playerState.context_uri.arg = &this->playerContextUri;
+  // playerState.context_url.funcs.encode = &cspot::pbEncodeString;
+  // playerState.context_url.arg = &this->playerContextUrl;
+  resetState();
 }
 
 void ConnectDeviceState::resetState() {
@@ -114,7 +116,7 @@ void ConnectDeviceState::setActive(bool active) {
   this->isActive = active;
   this->activeSince = std::chrono::system_clock::now();
 
-  putState();
+  putState(PutStateReason_PLAYER_STATE_CHANGED);
 }
 
 bell::Result<> ConnectDeviceState::putState(PutStateReason reason) {
@@ -136,6 +138,8 @@ bell::Result<> ConnectDeviceState::handlePlayerCommand(
   auto& payload = messageJson.at("payload");
   auto& command = payload.at("command");
   std::string endpoint = command.at("endpoint").get_string();
+  lastCommandMessageId = payload.at("message_id").get_unsigned();
+  lastCommandFromDeviceId = payload.at("sent_by_device_id").get_string();
 
   if (endpoint == "transfer") {
     BELL_LOG(info, LOG_TAG, "Received transfer command");
@@ -176,15 +180,28 @@ bell::Result<> ConnectDeviceState::handleTransferCommand(
 
   TransferState transferState = TransferState_init_zero;
 
-  trackQueue->pbAssignDecodeCallbacksForQueue(&transferState.queue);
+  std::string contextUri;
+  std::string contextUrl;
+  std::string sessionId;
+  std::vector<ContextPage> contextPages;
+
+  // trackQueue->pbAssignDecodeCallbacksForQueue(&transferState.queue);
 
   // Assign the decode functions for the protobuf fields
   transferState.current_session.context.uri.funcs.decode =
       &cspot::pbDecodeString;
-  transferState.current_session.context.uri.arg = &this->playerContextUri;
+  transferState.current_session.context.uri.arg = &contextUri;
   transferState.current_session.context.url.funcs.decode =
       &cspot::pbDecodeString;
-  transferState.current_session.context.url.arg = &this->playerContextUrl;
+  transferState.current_session.context.url.arg = &contextUrl;
+
+  transferState.current_session.context.pages.funcs.decode =
+      &pbDecodeContextPageList;
+  transferState.current_session.context.pages.arg = &contextPages;
+
+  transferState.current_session.original_session_id.funcs.decode =
+      &pbDecodeString;
+  transferState.current_session.original_session_id.arg = &sessionId;
 
   auto decodeRes = pbDecodeMessage(decodedData.data(), decodedData.size(),
                                    TransferState_fields, &transferState);
@@ -192,6 +209,82 @@ bell::Result<> ConnectDeviceState::handleTransferCommand(
     BELL_LOG(error, LOG_TAG, "Failed to decode transfer state");
     return decodeRes.getError();
   }
+
+  std::cout << "Transfer state decoded successfully" << std::endl;
+  std::cout << "Context URI: " << contextUri << std::endl;
+  std::cout << "Context URL: " << contextUrl << std::endl;
+
+  auto ctx = spClient->contextResolve(contextUri).unwrap();
+  auto& currentPage = ctx["pages"][0];
+
+  for (tao::json::value& track : currentPage["tracks"].get_array()) {
+    ProvidedTrack pTrack;
+    pTrack.provider = "context";
+    pTrack.uri = track["uri"].as<std::string>();
+    pTrack.uid = track["uid"].as<std::string>();
+
+    nextTracks.push_back(pTrack);
+    if (nextTracks.size() > 6) {
+      break;
+    }
+  }
+
+  currentTrack = nextTracks[0];
+  nextTracks.erase(nextTracks.begin());
+
+  auto& playerState = stateRequestProto.device.player_state;
+  playerState.next_tracks.funcs.encode = &cspot::pbEncodeProvidedTrackList;
+  playerState.next_tracks.arg = &nextTracks;
+  playerState.prev_tracks.funcs.encode = &cspot::pbEncodeProvidedTrackList;
+  playerState.prev_tracks.arg = &prevTracks;
+
+  playerState.track.uid.arg = &currentTrack.uid;
+  playerState.track.uid.funcs.encode = &pbEncodeString;
+
+  playerState.track.provider.arg = &currentTrack.provider;
+  playerState.track.provider.funcs.encode = &pbEncodeString;
+
+  playerState.track.uri.arg = &currentTrack.uri;
+  playerState.track.uri.funcs.encode = &pbEncodeString;
+
+  playerState.context_uri.arg = &contextUri;
+  playerState.context_uri.funcs.encode = &pbEncodeString;
+
+  playerState.context_url.arg = &contextUrl;
+  playerState.context_url.funcs.encode = &pbEncodeString;
+
+  playerState.has_index = true;
+  playerState.index.page = 0;
+  playerState.index.track = 0;
+  playerState.has_track = true;
+  playerState.is_playing = true;
+  playerState.is_buffering = false;
+  playerState.is_paused = false;
+  playerState.playback_speed = 1.0;
+  playerState.duration = 3600;
+  playerState.position = 50;
+
+  playerState.session_id.arg = &sessionId;
+  playerState.session_id.funcs.encode = &pbEncodeString;
+
+  playerState.timestamp = transferState.playback.timestamp;
+  playerState.position_as_of_timestamp =
+      transferState.playback.position_as_of_timestamp;
+  playerState.position = transferState.playback.position_as_of_timestamp;
+
+  std::cout << "Device has been updated" << std::endl;
+  std::cout << nextTracks.size() << " next tracks" << std::endl;
+  std::cout << prevTracks.size() << " prev tracks" << std::endl;
+
+  stateRequestProto.started_playing_at =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count();
+  stateRequestProto.last_command_message_id = lastCommandMessageId;
+  stateRequestProto.last_command_sent_by_device_id.arg =
+      &lastCommandFromDeviceId;
+  stateRequestProto.last_command_sent_by_device_id.funcs.encode =
+      &pbEncodeString;
 
   setActive(true);
 

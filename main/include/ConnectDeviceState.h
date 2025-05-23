@@ -3,6 +3,7 @@
 #include <string>
 
 // Protobufs
+#include "NanoPBExtensions.h"
 #include "bell/Result.h"
 #include "connect.pb.h"
 
@@ -33,13 +34,16 @@ class ConnectDeviceState {
   std::shared_ptr<SpClient> spClient;
   std::shared_ptr<TrackQueue> trackQueue;
 
+  std::vector<cspot::ProvidedTrack> nextTracks;
+  std::vector<cspot::ProvidedTrack> prevTracks;
+  cspot::ProvidedTrack currentTrack;
+
   PutStateRequest stateRequestProto{};
+  std::string lastCommandFromDeviceId;
+  uint32_t lastCommandMessageId;
 
   std::string deviceName;
   std::string deviceId;
-
-  std::string playerContextUri;
-  std::string playerContextUrl;
 
   bool isActive = false;
 
