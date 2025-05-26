@@ -28,40 +28,20 @@ ConnectDeviceState::ConnectDeviceState(
 }
 
 void ConnectDeviceState::initialize() {
-  stateRequestProto = PutStateRequest_init_zero;
-  this->deviceId = this->sessionContext->loginBlob->getDeviceId();
-  this->deviceName = this->sessionContext->loginBlob->getDeviceName();
-
-  stateRequestProto.has_device = true;
-
   auto& deviceProto = stateRequestProto.device;
 
-  deviceProto.has_device_info = true;
-  deviceProto.has_player_state = true;
-
-  auto& deviceInfo = deviceProto.device_info;
-  deviceInfo.can_play = true;
+  auto& deviceInfo = deviceProto.deviceInfo;
+  deviceInfo.canPlay = true;
   deviceInfo.volume = 100;
+  deviceInfo.name = sessionContext->loginBlob->getDeviceName();
 
-  deviceInfo.name.funcs.encode = &cspot::pbEncodeString;
-  deviceInfo.name.arg = &this->deviceName;
+  deviceInfo.deviceType = DeviceType_SPEAKER;
+  deviceInfo.deviceSoftwareVersion = deviceSoftwareVersion;
+  deviceInfo.deviceId = sessionContext->loginBlob->getDeviceId();
+  deviceInfo.clientId = deviceId;
+  deviceInfo.spircVersion = spircVersion;
 
-  deviceInfo.device_type = DeviceType_SPEAKER;
-  deviceInfo.device_software_version.funcs.encode = &cspot::pbEncodeString;
-  deviceInfo.device_software_version.arg = &deviceSoftwareVersion;
-  deviceInfo.device_id.funcs.encode = &cspot::pbEncodeString;
-  deviceInfo.device_id.arg = &deviceName;
-
-  deviceInfo.client_id.funcs.encode = &cspot::pbEncodeString;
-  deviceInfo.client_id.arg = &deviceId;
-
-  deviceInfo.spirc_version.funcs.encode = &cspot::pbEncodeString;
-  deviceInfo.spirc_version.arg = &spircVersion;
-
-  deviceInfo.capabilities = Capabilities_init_zero;
-  deviceInfo.has_capabilities = true;
-
-  auto& capabilities = deviceInfo.capabilities;
+  auto& capabilities = deviceInfo.capabilities.rawProto;
 
   // Init capatilities
   capabilities.can_be_player = true;
@@ -69,10 +49,6 @@ void ConnectDeviceState::initialize() {
   capabilities.gaia_eq_connect_id = true;
   capabilities.supports_logout = true;
   capabilities.is_observable = true;
-
-  capabilities.supported_types.funcs.encode = &cspot::pbEncodeStringVector;
-  capabilities.supported_types.arg = &supportedTypes;
-
   capabilities.volume_steps = 100;
   capabilities.command_acks = true;
   capabilities.supports_rename = false;
@@ -89,17 +65,8 @@ void ConnectDeviceState::initialize() {
   capabilities.needs_full_player_state = false;
   capabilities.supports_gzip_pushes = false;  // TODO: Should we support this?
   capabilities.has_supports_hifi = false;
+  deviceInfo.capabilities.supportedTypes = supportedTypes;
 
-  capabilities.connect_capabilities.funcs.encode = &cspot::pbEncodeString;
-  capabilities.connect_capabilities.arg =
-      &connectCapabilities;  // TODO: Set to actual capabilities
-
-  // auto& playerState = stateRequestProto.device.player_state;
-
-  // playerState.context_uri.funcs.encode = &cspot::pbEncodeString;
-  // playerState.context_uri.arg = &this->playerContextUri;
-  // playerState.context_url.funcs.encode = &cspot::pbEncodeString;
-  // playerState.context_url.arg = &this->playerContextUrl;
   resetState();
 }
 
@@ -107,9 +74,9 @@ void ConnectDeviceState::resetState() {
   this->isActive = false;
   this->activeSince = std::chrono::system_clock::now();
 
-  auto& playerState = stateRequestProto.device.player_state;
-  playerState.is_system_initiated = true;
-  playerState.playback_speed = 1.0;
+  auto& playerState = stateRequestProto.device.playerState;
+  playerState.isSystemInitiated = true;
+  playerState.playbackSpeed = 1.0;
 }
 
 void ConnectDeviceState::setActive(bool active) {
@@ -121,14 +88,13 @@ void ConnectDeviceState::setActive(bool active) {
 
 bell::Result<> ConnectDeviceState::putState(PutStateReason reason) {
   // get milliseconds since epoch;
-  stateRequestProto.client_side_timestamp =
+  stateRequestProto.clientSideTimestamp =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::system_clock::now().time_since_epoch())
           .count();
-  stateRequestProto.is_active = this->isActive;
-  stateRequestProto.member_type = MemberType_CONNECT_STATE;
-  stateRequestProto.put_state_reason = reason;
-  stateRequestProto.has_device = true;
+  stateRequestProto.isActive = this->isActive;
+  stateRequestProto.memberType = MemberType_CONNECT_STATE;
+  stateRequestProto.putStateReason = reason;
 
   return this->spClient->putConnectState(stateRequestProto);
 }
@@ -138,8 +104,10 @@ bell::Result<> ConnectDeviceState::handlePlayerCommand(
   auto& payload = messageJson.at("payload");
   auto& command = payload.at("command");
   std::string endpoint = command.at("endpoint").get_string();
-  lastCommandMessageId = payload.at("message_id").get_unsigned();
-  lastCommandFromDeviceId = payload.at("sent_by_device_id").get_string();
+  stateRequestProto.lastCommandMessageId =
+      payload.at("message_id").get_unsigned();
+  stateRequestProto.lastCommandSentByDeviceId =
+      payload.at("sent_by_device_id").get_string();
 
   if (endpoint == "transfer") {
     BELL_LOG(info, LOG_TAG, "Received transfer command");
@@ -178,115 +146,94 @@ bell::Result<> ConnectDeviceState::handleTransferCommand(
     return std::errc::bad_message;
   }
 
-  TransferState transferState = TransferState_init_zero;
+  cspot_proto::TransferState transferState;
 
-  std::string contextUri;
-  std::string contextUrl;
-  std::string sessionId;
-  std::vector<ContextPage> contextPages;
-
-  // trackQueue->pbAssignDecodeCallbacksForQueue(&transferState.queue);
-
-  // Assign the decode functions for the protobuf fields
-  transferState.current_session.context.uri.funcs.decode =
-      &cspot::pbDecodeString;
-  transferState.current_session.context.uri.arg = &contextUri;
-  transferState.current_session.context.url.funcs.decode =
-      &cspot::pbDecodeString;
-  transferState.current_session.context.url.arg = &contextUrl;
-
-  transferState.current_session.context.pages.funcs.decode =
-      &pbDecodeContextPageList;
-  transferState.current_session.context.pages.arg = &contextPages;
-
-  transferState.current_session.original_session_id.funcs.decode =
-      &pbDecodeString;
-  transferState.current_session.original_session_id.arg = &sessionId;
-
-  auto decodeRes = pbDecodeMessage(decodedData.data(), decodedData.size(),
-                                   TransferState_fields, &transferState);
-  if (!decodeRes) {
+  bool res = nanopb_helper::decodeFromVector(transferState, decodedData);
+  if (!res) {
     BELL_LOG(error, LOG_TAG, "Failed to decode transfer state");
-    return decodeRes.getError();
+    return std::errc::bad_message;
   }
 
   std::cout << "Transfer state decoded successfully" << std::endl;
-  std::cout << "Context URI: " << contextUri << std::endl;
-  std::cout << "Context URL: " << contextUrl << std::endl;
+  std::cout << "Context URI: " << transferState.current_session.context.uri
+            << std::endl;
 
-  auto ctx = spClient->contextResolve(contextUri).unwrap();
+  auto ctx = spClient->contextResolve(transferState.current_session.context.uri)
+                 .unwrap();
   auto& currentPage = ctx["pages"][0];
 
-  for (tao::json::value& track : currentPage["tracks"].get_array()) {
-    ProvidedTrack pTrack;
-    pTrack.provider = "context";
-    pTrack.uri = track["uri"].as<std::string>();
-    pTrack.uid = track["uid"].as<std::string>();
+  auto& playerState = stateRequestProto.device.playerState;
 
-    nextTracks.push_back(pTrack);
-    if (nextTracks.size() > 6) {
-      break;
-    }
+  for (tao::json::value& track : currentPage["tracks"].get_array()) {
+    cspot_proto::ProvidedTrack providedTrack;
+    providedTrack.provider = "context";
+    providedTrack.uri = track["uri"].as<std::string>();
+    providedTrack.uid = track["uid"].as<std::string>();
+
+    playerState.nextTracks.push_back(providedTrack);
   }
 
-  currentTrack = nextTracks[0];
-  nextTracks.erase(nextTracks.begin());
+  playerState.track = playerState.nextTracks.front();
+  playerState.nextTracks.erase(playerState.nextTracks.begin());
 
-  auto& playerState = stateRequestProto.device.player_state;
-  playerState.next_tracks.funcs.encode = &cspot::pbEncodeProvidedTrackList;
-  playerState.next_tracks.arg = &nextTracks;
-  playerState.prev_tracks.funcs.encode = &cspot::pbEncodeProvidedTrackList;
-  playerState.prev_tracks.arg = &prevTracks;
 
-  playerState.track.uid.arg = &currentTrack.uid;
-  playerState.track.uid.funcs.encode = &pbEncodeString;
 
-  playerState.track.provider.arg = &currentTrack.provider;
-  playerState.track.provider.funcs.encode = &pbEncodeString;
 
-  playerState.track.uri.arg = &currentTrack.uri;
-  playerState.track.uri.funcs.encode = &pbEncodeString;
+  // auto& playerState = stateRequestProto.device.player_state;
+  // playerState.next_tracks.funcs.encode = &cspot::pbEncodeProvidedTrackList;
+  // playerState.next_tracks.arg = &nextTracks;
+  // playerState.prev_tracks.funcs.encode = &cspot::pbEncodeProvidedTrackList;
+  // playerState.prev_tracks.arg = &prevTracks;
 
-  playerState.context_uri.arg = &contextUri;
-  playerState.context_uri.funcs.encode = &pbEncodeString;
+  // playerState.track.uid.arg = &currentTrack.uid;
+  // playerState.track.uid.funcs.encode = &pbEncodeString;
 
-  playerState.context_url.arg = &contextUrl;
-  playerState.context_url.funcs.encode = &pbEncodeString;
+  // playerState.track.provider.arg = &currentTrack.provider;
+  // playerState.track.provider.funcs.encode = &pbEncodeString;
 
-  playerState.has_index = true;
-  playerState.index.page = 0;
-  playerState.index.track = 0;
-  playerState.has_track = true;
-  playerState.is_playing = true;
-  playerState.is_buffering = false;
-  playerState.is_paused = false;
-  playerState.playback_speed = 1.0;
-  playerState.duration = 3600;
-  playerState.position = 50;
+  // playerState.track.uri.arg = &currentTrack.uri;
+  // playerState.track.uri.funcs.encode = &pbEncodeString;
 
-  playerState.session_id.arg = &sessionId;
-  playerState.session_id.funcs.encode = &pbEncodeString;
+  // playerState.context_uri.arg = &contextUri;
+  // playerState.context_uri.funcs.encode = &pbEncodeString;
 
-  playerState.timestamp = transferState.playback.timestamp;
-  playerState.position_as_of_timestamp =
-      transferState.playback.position_as_of_timestamp;
-  playerState.position = transferState.playback.position_as_of_timestamp;
+  // playerState.context_url.arg = &contextUrl;
+  // playerState.context_url.funcs.encode = &pbEncodeString;
 
-  std::cout << "Device has been updated" << std::endl;
-  std::cout << nextTracks.size() << " next tracks" << std::endl;
-  std::cout << prevTracks.size() << " prev tracks" << std::endl;
+  // playerState.has_index = true;
+  // playerState.index.page = 0;
+  // playerState.index.track = 0;
+  // playerState.has_track = true;
+  // playerState.is_playing = true;
+  // playerState.is_buffering = false;
+  // playerState.is_paused = false;
+  // playerState.playback_speed = 1.0;
+  // playerState.duration = 3600;
+  // playerState.position = 50;
 
-  stateRequestProto.started_playing_at =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now().time_since_epoch())
-          .count();
-  stateRequestProto.last_command_message_id = lastCommandMessageId;
-  stateRequestProto.last_command_sent_by_device_id.arg =
-      &lastCommandFromDeviceId;
-  stateRequestProto.last_command_sent_by_device_id.funcs.encode =
-      &pbEncodeString;
+  // playerState.session_id.arg = &sessionId;
+  // playerState.session_id.funcs.encode = &pbEncodeString;
 
-  setActive(true);
+  // playerState.timestamp = transferState.playback.timestamp;
+  // playerState.position_as_of_timestamp =
+  //     transferState.playback.position_as_of_timestamp;
+  // playerState.position = transferState.playback.position_as_of_timestamp;
+
+  // std::cout << "Device has been updated" << std::endl;
+  // std::cout << nextTracks.size() << " next tracks" << std::endl;
+  // std::cout << prevTracks.size() << " prev tracks" << std::endl;
+
+  // stateRequestProto.started_playing_at =
+  //     std::chrono::duration_cast<std::chrono::milliseconds>(
+  //         std::chrono::system_clock::now().time_since_epoch())
+  //         .count();
+  // stateRequestProto.last_command_message_id = lastCommandMessageId;
+  // stateRequestProto.last_command_sent_by_device_id.arg =
+  //     &lastCommandFromDeviceId;
+  // stateRequestProto.last_command_sent_by_device_id.funcs.encode =
+  //     &pbEncodeString;
+
+  // setActive(true);
 
   return {};
 }

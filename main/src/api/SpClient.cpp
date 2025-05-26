@@ -24,30 +24,19 @@ bell::Result<> SpClient::putConnectStateInactive(int retryCount) {
   return {};
 }
 
-bell::Result<> SpClient::putConnectState(const PutStateRequest& stateRequest,
-                                         int retryCount) {
-  auto encodeRes =
-      pbCalculateEncodedSize(PutStateRequest_fields, &stateRequest);
+bell::Result<> SpClient::putConnectState(
+    cspot_proto::PutStateRequest& stateRequest, int retryCount) {
+  bool encodeRes = nanopb_helper::encodeToVector(stateRequest, requestBuffer);
   if (!encodeRes) {
-    BELL_LOG(error, LOG_TAG, "Error while calculating encoded size: {}",
-             encodeRes.errorMessage());
-    return encodeRes.getError();
+    BELL_LOG(error, LOG_TAG, "Error while encoding message");
+    return std::errc::bad_message;
   }
 
-  if (requestBuffer.size() < encodeRes.getValue()) {
-    requestBuffer.resize(encodeRes.getValue());
-  }
+  std::vector<uint8_t> freshBuffer;
+  encodeRes = nanopb_helper::encodeToVector(stateRequest, freshBuffer);
 
-  encodeRes = pbEncodeMessage(reinterpret_cast<uint8_t*>(requestBuffer.data()),
-                              requestBuffer.size(), PutStateRequest_fields,
-                              &stateRequest);
-  if (!encodeRes) {
-    BELL_LOG(error, LOG_TAG, "Error while encoding message: {}",
-             encodeRes.errorMessage());
-    return encodeRes.getError();
-  }
-
-  logDataBase64(reinterpret_cast<uint8_t*>(requestBuffer.data()), encodeRes.getValue());
+  logDataBase64(reinterpret_cast<uint8_t*>(freshBuffer.data()),
+                freshBuffer.size());
 
   auto addrRes = sessionContext->credentialsResolver->getApAddress(
       CredentialsResolver::AddressType::SpClient);
@@ -64,7 +53,7 @@ bell::Result<> SpClient::putConnectState(const PutStateRequest& stateRequest,
   }
   auto accessToken = keyRes.takeValue();
 
-  size_t encodedLength = encodeRes.getValue();
+  // size_t encodedLength = encodeRes;
 
   auto response = bell::http::requestWithBodyPtr(
       bell::HTTPMethod::PUT,
@@ -78,7 +67,8 @@ bell::Result<> SpClient::putConnectState(const PutStateRequest& stateRequest,
           {"X-Spotify-Connection-Id", sessionContext->sessionId},
           {"Authorization", fmt::format("Bearer {}", accessToken)},
       },
-      requestBuffer.data(), encodedLength);
+      reinterpret_cast<const std::byte*>(requestBuffer.data()),
+      requestBuffer.size());
 
   if (!response) {
     BELL_LOG(error, LOG_TAG, "Error while sending request: {}",

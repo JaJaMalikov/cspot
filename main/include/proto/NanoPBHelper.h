@@ -1,0 +1,294 @@
+#pragma once
+
+// System includes
+#include <optional>
+#include <string>
+#include <vector>
+
+// NanoPB includes
+#include "pb.h"
+#include "pb_decode.h"
+#include "pb_encode.h"
+
+namespace nanopb_helper {
+
+// Basic decoders
+bool pbDecodeString(pb_istream_t* stream, const pb_field_t* field, void** arg);
+bool pbDecodeFixed64(pb_istream_t* stream, const pb_field_t* field, void** arg);
+bool pbDecodeFixed32(pb_istream_t* stream, const pb_field_t* field, void** arg);
+bool pbDecodeStringList(pb_istream_t* stream, const pb_field_t* field,
+                        void** arg);
+bool pbDecodeUint8Vector(pb_istream_t* stream, const pb_field_t* field,
+                         void** arg);
+
+// Basic encoders
+bool pbEncodeString(pb_ostream_t* stream, const pb_field_t* field,
+                    void* const* arg);
+bool pbEncodeFixed64(pb_ostream_t* stream, const pb_field_t* field,
+                     void* const* arg);
+bool pbEncodeFixed32(pb_ostream_t* stream, const pb_field_t* field,
+                     void* const* arg);
+bool pbEncodeStringList(pb_ostream_t* stream, const pb_field_t* field,
+                        void* const* arg);
+bool pbEncodeUint8Vector(pb_ostream_t* stream, const pb_field_t* field,
+                         void* const* arg);
+
+// Integer handling
+template <typename IntegerT>
+bool pbDecodeVarint(pb_istream_t* stream, const pb_field_t* field, void** arg) {
+  auto* target = static_cast<IntegerT*>(*arg);
+  uint64_t value;
+  if (!pb_decode_varint(stream, &value)) {
+    return false;
+  }
+  *target = static_cast<IntegerT>(value);
+  return true;
+}
+
+template <typename IntegerT>
+bool pbEncodeVarint(pb_ostream_t* stream, const pb_field_t* field,
+                    void* const* arg) {
+  const auto value = static_cast<uint64_t>(*static_cast<const IntegerT*>(*arg));
+  if (!pb_encode_tag_for_field(stream, field)) {
+    return false;
+  }
+  return pb_encode_varint(stream, value);
+}
+
+// Binding helpers
+template <typename FieldT>
+void bindField(pb_callback_t& pbField, FieldT& field, bool isDecode) {
+  static_assert(sizeof(FieldT) == 0, "No specialization for this field type");
+}
+
+// String types
+inline void bindField(pb_callback_t& pbField, std::string& field,
+                      bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeString;
+  } else {
+    pbField.funcs.encode = &pbEncodeString;
+  }
+  pbField.arg = &field;
+}
+
+// Integer types
+template <typename IntegerT>
+void bindVarintField(pb_callback_t& pbField, IntegerT& field, bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeVarint<IntegerT>;
+  } else {
+    pbField.funcs.encode = &pbEncodeVarint<IntegerT>;
+  }
+  pbField.arg = &field;
+}
+
+// String vector types
+inline void bindField(pb_callback_t& pbField, std::vector<std::string>& field,
+                      bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeStringList;
+  } else {
+    pbField.funcs.encode = &pbEncodeStringList;
+  }
+
+  pbField.arg = &field;
+}
+
+// Bytes vector types
+inline void bindField(pb_callback_t& pbField, std::vector<uint8_t>& field,
+                      bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeUint8Vector;
+  } else {
+    pbField.funcs.encode = &pbEncodeUint8Vector;
+  }
+
+  pbField.arg = &field;
+}
+
+// Bytes boolean type
+inline void bindField(pb_callback_t& pbField, bool& field, bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeVarint<bool>;
+  } else {
+    pbField.funcs.encode = &pbEncodeVarint<bool>;
+  }
+
+  pbField.arg = &field;
+}
+
+// Double type
+inline void bindField(pb_callback_t& pbField, double& field, bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeFixed64;
+  } else {
+    pbField.funcs.encode = &pbEncodeFixed64;
+  }
+
+  pbField.arg = &field;
+}
+
+// Float type
+inline void bindField(pb_callback_t& pbField, float& field, bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeFixed32;
+  } else {
+    pbField.funcs.encode = &pbEncodeFixed32;
+  }
+
+  pbField.arg = &field;
+}
+
+template <typename T>
+struct Optional {
+  T value{};
+  bool hasValue = false;
+  pb_callback_t wrappedCallback;
+
+  static bool decode(pb_istream_t* stream, const pb_field_t* field,
+                     void** arg) {
+    auto* self = static_cast<Optional<T>*>(*arg);
+    self->hasValue = true;
+    void* valuePtr = &self->value;
+    return self->wrappedCallback.funcs.decode(stream, field, &valuePtr);
+  }
+
+  static bool encode(pb_ostream_t* stream, const pb_field_t* field,
+                     void* const* arg) {
+    auto* self = static_cast<Optional<T>*>(*arg);
+    if (!self->hasValue) {
+      return true;  // No value to encode, just return true
+    }
+
+    void* valuePtr = &self->value;
+    return self->wrappedCallback.funcs.encode(stream, field, &valuePtr);
+  }
+};
+
+// Specialization for Optional<T>
+template <typename T>
+inline void bindField(pb_callback_t& pbField, Optional<T>& field,
+                      bool isDecode) {
+  bindField(field.wrappedCallback, field.value, isDecode);
+
+  if (isDecode) {
+    pbField.funcs.decode = &Optional<T>::decode;
+  } else {
+    pbField.funcs.encode = &Optional<T>::encode;
+  }
+
+  pbField.arg = &field;
+}
+
+// Struct handlers
+template <typename StructT>
+struct StructCodec {
+  static bool decode(pb_istream_t* stream, const pb_field_t* field,
+                     void** arg) {
+    static_assert(sizeof(StructT) == 0, "No decoder specialization found");
+    return false;
+  }
+
+  static bool encode(pb_ostream_t* stream, const pb_field_t* field,
+                     void* const* arg) {
+    static_assert(sizeof(StructT) == 0, "No encoder specialization found");
+    return false;
+  }
+};
+
+#define NANOPB_STRUCT(StructName, NanopbFields)                                \
+  namespace nanopb_helper {                                                    \
+  template <>                                                                  \
+  struct StructCodec<StructName> {                                             \
+    static bool decode(pb_istream_t* s, const pb_field_t* f, void** a) {       \
+      auto proto = StructName::bindFields(static_cast<StructName*>(*a), true); \
+      return pb_decode(s, NanopbFields, &proto);                               \
+    }                                                                          \
+    static bool encodeSubmessage(pb_ostream_t* s, const pb_field_t* f,         \
+                                 void* const* a) {                             \
+                                                                               \
+      if (!pb_encode_tag_for_field(s, f))                                      \
+        return false;                                                          \
+      auto proto =                                                             \
+          StructName::bindFields(static_cast<StructName*>(*a), false);         \
+      return pb_encode_submessage(s, NanopbFields, &proto);                    \
+    }                                                                          \
+    static bool encode(pb_ostream_t* s, const pb_field_t* f, void* const* a) { \
+      auto proto =                                                             \
+          StructName::bindFields(static_cast<StructName*>(*a), false);         \
+      return pb_encode(s, NanopbFields, &proto);                               \
+    }                                                                          \
+    static bool decodeVector(pb_istream_t* s, const pb_field_t* f, void** a) { \
+      StructName item{};                                                       \
+      auto* vec = static_cast<std::vector<StructName>*>(*a);                   \
+      void* itemPtr = &item;                                                   \
+      bool result = decode(s, f, &itemPtr);                                    \
+      if (result)                                                              \
+        vec->push_back(item);                                                  \
+      return result;                                                           \
+    }                                                                          \
+    static bool encodeVector(pb_ostream_t* s, const pb_field_t* f,             \
+                             void* const* a) {                                 \
+      auto* vec = static_cast<std::vector<StructName>*>(*a);                   \
+      for (auto& item : *vec) {                                                \
+        void* itemPtr = &item;                                                 \
+        if (!encodeSubmessage(s, f, &itemPtr))                                 \
+          return false;                                                        \
+      }                                                                        \
+      return true;                                                             \
+    }                                                                          \
+  };                                                                           \
+  inline void bindField(pb_callback_t& pbField, StructName& field,             \
+                        bool isDecode) {                                       \
+    if (isDecode) {                                                            \
+      pbField.funcs.decode = &nanopb_helper::StructCodec<StructName>::decode;  \
+    } else {                                                                   \
+      pbField.funcs.encode =                                                   \
+          &nanopb_helper::StructCodec<StructName>::encodeSubmessage;           \
+    }                                                                          \
+    pbField.arg = &field;                                                      \
+  }                                                                            \
+  inline void bindField(pb_callback_t& pbField,                                \
+                        std::vector<StructName>& field, bool isDecode) {       \
+    if (isDecode) {                                                            \
+      pbField.funcs.decode =                                                   \
+          &nanopb_helper::StructCodec<StructName>::decodeVector;               \
+    } else {                                                                   \
+      pbField.funcs.encode =                                                   \
+          &nanopb_helper::StructCodec<StructName>::encodeVector;               \
+    }                                                                          \
+    pbField.arg = &field;                                                      \
+  }                                                                            \
+  }
+
+template <typename MessageT>
+bool encodeToVector(MessageT& message, std::vector<uint8_t>& output) {
+  // Actual encoding
+  pb_ostream_t stream;
+  stream.callback = [](pb_ostream_t* stream, const pb_byte_t* buf,
+                       size_t count) -> bool {
+    auto* vec = static_cast<std::vector<uint8_t>*>(stream->state);
+    vec->insert(vec->end(), buf, buf + count);
+    return true;
+  };
+  stream.state = &output;
+  stream.max_size = SIZE_MAX;
+  stream.bytes_written = 0;
+
+  void* messagePtr = &message;
+  return nanopb_helper::StructCodec<MessageT>::encode(&stream, nullptr,
+                                                      &messagePtr);
+}
+
+template <typename MessageT>
+bool decodeFromVector(MessageT& message, const std::vector<uint8_t>& input) {
+  message = MessageT();  // Reset the message to its default state
+
+  pb_istream_t stream = pb_istream_from_buffer(input.data(), input.size());
+  void* messagePtr = &message;
+  return nanopb_helper::StructCodec<MessageT>::decode(&stream, nullptr,
+                                                      &messagePtr);
+}
+
+}  // namespace nanopb_helper

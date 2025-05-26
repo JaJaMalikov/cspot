@@ -10,6 +10,7 @@
 #include "SessionContext.h"
 #include "TrackQueue.h"
 #include "api/SpClient.h"
+#include "proto/ConnectPb.h"
 
 namespace cspot {
 
@@ -34,13 +35,9 @@ class ConnectDeviceState {
   std::shared_ptr<SpClient> spClient;
   std::shared_ptr<TrackQueue> trackQueue;
 
-  std::vector<cspot::ProvidedTrack> nextTracks;
-  std::vector<cspot::ProvidedTrack> prevTracks;
   cspot::ProvidedTrack currentTrack;
 
-  PutStateRequest stateRequestProto{};
-  std::string lastCommandFromDeviceId;
-  uint32_t lastCommandMessageId;
+  cspot_proto::PutStateRequest stateRequestProto;
 
   std::string deviceName;
   std::string deviceId;

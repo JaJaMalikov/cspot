@@ -31,6 +31,7 @@ enum DeviceType {
 }
 
 message PlayerState {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   int64 timestamp = 1;
   string context_uri = 2;
   string context_url = 3;
@@ -78,6 +79,7 @@ message ProvidedTrack {
 }
 
 message ContextIndex {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   uint32 page = 1;
   uint32 track = 2;
 }
@@ -134,6 +136,7 @@ message PlayOrigin {
 }
 
 message ContextPlayerOptions {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   bool shuffling_context = 1;
   bool repeating_context = 2;
   bool repeating_track = 3;
@@ -151,6 +154,7 @@ message InstrumentationParams {
 }
 
 message Playback {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   int64 timestamp = 1;
   int32 position_as_of_timestamp = 2;
   double playback_speed = 3;
@@ -161,11 +165,13 @@ message Playback {
 }
 
 message Queue {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   repeated ContextTrack tracks = 1;
   bool is_playing_queue = 2;
 }
 
 message Session {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   PlayOrigin play_origin = 1;
   Context context = 2;
   string current_uid = 3;
@@ -178,6 +184,7 @@ message Session {
 }
 
 message TransferState {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   ContextPlayerOptions options = 1;
   Playback playback = 2;
   Session current_session = 3;
@@ -185,6 +192,7 @@ message TransferState {
 }
 
 message ContextTrack {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   string uri = 1;
   string uid = 2;
   bytes gid = 3;
@@ -200,6 +208,7 @@ message ContextPlayerOptionOverrides {
 }
 
 message Context {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   string uri = 1;
   string url = 2;
   map<string, string> metadata = 3;
@@ -209,6 +218,7 @@ message Context {
 }
 
 message ContextPage {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   string page_url = 1;
   string next_page_url = 2;
   map<string, string> metadata = 3;
@@ -262,6 +272,7 @@ message PostCommandResponse {
 }
 
 message Device {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   DeviceInfo device_info = 1;
   PlayerState player_state = 2;
   PrivateDeviceInfo private_device_info = 3;
@@ -283,6 +294,7 @@ message Cluster {
 }
 
 message PutStateRequest {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   string callback_url = 1;
   Device device = 2;
   MemberType member_type = 3;
@@ -306,6 +318,7 @@ message SubscribeRequest {
 }
 
 message DeviceInfo {
+  option (nanopb_msgopt).type = FT_CALLBACK;
   bool can_play = 1;
   uint32 volume = 2;
   string name = 3;

@@ -11,6 +11,7 @@
 #include "connect.pb.h"
 
 #include "SessionContext.h"
+#include "proto/ConnectPb.h"
 
 namespace cspot {
 class SpClient {
@@ -18,7 +19,7 @@ class SpClient {
   SpClient(std::shared_ptr<SessionContext> sessionContext);
 
   bell::Result<> putConnectStateInactive(int retryCount = 3);
-  bell::Result<> putConnectState(const PutStateRequest& stateRequest,
+  bell::Result<> putConnectState(cspot_proto::PutStateRequest& stateRequest,
                                  int retryCount = 3);
   bell::Result<tao::json::value> contextResolve(const std::string& contextUri);
 
@@ -32,6 +33,6 @@ class SpClient {
   const char* LOG_TAG = "SpClient";
 
   std::shared_ptr<SessionContext> sessionContext;
-  std::vector<std::byte> requestBuffer;
+  std::vector<std::uint8_t> requestBuffer;
 };
 }  // namespace cspot
