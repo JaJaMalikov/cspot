@@ -301,15 +301,15 @@ namespace cspot_proto {
 struct PutStateRequest {
   cspot_proto::Device device;
   MemberType memberType;
-  bool isActive;
+  bool isActive = false;
   PutStateReason putStateReason;
-  uint32_t mesasgeId;
+  uint32_t mesasgeId = 0;
   std::string lastCommandSentByDeviceId;
-  uint32_t lastCommandMessageId;
-  uint64_t startedPlayingAt;
-  uint64_t hasBeenPlayingForMs;
-  uint64_t clientSideTimestamp;
-  bool onlyWritePlayerState;
+  uint32_t lastCommandMessageId = 0;
+  uint64_t startedPlayingAt = 0;
+  uint64_t hasBeenPlayingForMs = 0;
+  uint64_t clientSideTimestamp = 0;
+  bool onlyWritePlayerState = false;
 
   static auto bindFields(PutStateRequest* self, bool isDecode) {
     _PutStateRequest rawProto = PutStateRequest_init_zero;

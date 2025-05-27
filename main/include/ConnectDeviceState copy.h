@@ -1,12 +1,14 @@
 #pragma once
 
-#include <mutex>
+#include <string>
 
 // Protobufs
+#include "NanoPBExtensions.h"
 #include "bell/Result.h"
 #include "connect.pb.h"
 
 #include "SessionContext.h"
+#include "TrackQueue.h"
 #include "api/SpClient.h"
 #include "proto/ConnectPb.h"
 
@@ -19,15 +21,9 @@ class ConnectDeviceState {
 
   void resetState();
 
-  std::scoped_lock<std::mutex> lock();
-
   void setActive(bool active);
 
-  void assignLastMessageId(uint32_t messageId,
-                           const std::string& sentByDeviceId);
-
-  // Returns a pointer to the player state proto
-  cspot_proto::PlayerState& getPlayerState();
+  bell::Result<> handlePlayerCommand(tao::json::value& messageJson);
 
   bell::Result<> putState(
       PutStateReason reason = PutStateReason_PLAYER_STATE_CHANGED);
@@ -37,11 +33,21 @@ class ConnectDeviceState {
 
   std::shared_ptr<SessionContext> sessionContext;
   std::shared_ptr<SpClient> spClient;
+  std::shared_ptr<TrackQueue> trackQueue;
 
-  std::mutex protoMutex;
-  cspot_proto::PutStateRequest putStateRequestProto;
+  cspot::ProvidedTrack currentTrack;
 
-  // Assigns device info
+  cspot_proto::PutStateRequest stateRequestProto;
+
+  std::string deviceName;
+  std::string deviceId;
+
+  bool isActive = false;
+
   void initialize();
+
+  bell::Result<> handleTransferCommand(std::string_view payloadDataStr);
+
+  std::chrono::system_clock::time_point activeSince;
 };
 }  // namespace cspot
