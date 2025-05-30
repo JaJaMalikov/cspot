@@ -81,7 +81,7 @@ message HashCashAnswer {
 }
 
 message ChallengeAnswer {
-  ChallengeType ChallengeType = 1;
+  ChallengeType challengeType = 1;
 
   oneof answer {
     ClientSecretHMACAnswer client_secret = 2;

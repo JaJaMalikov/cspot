@@ -38,6 +38,7 @@ add_subdirectory(../external/websocketpp ${CMAKE_CURRENT_BINARY_DIR}/websocketpp
 # Header only lib, create an interface for it
 add_library(websockets INTERFACE)
 target_include_directories(websockets INTERFACE ${websocketpp_SOURCE_DIR})
+target_compile_options(websockets INTERFACE -Wno-template-id-cdtor)
 
 list(APPEND EXTRA_LIBS websockets)
 

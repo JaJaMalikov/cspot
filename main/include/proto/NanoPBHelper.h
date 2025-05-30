@@ -339,13 +339,19 @@ bool encodeToVector(MessageT& message, std::vector<uint8_t>& output) {
 }
 
 template <typename MessageT>
-bool decodeFromVector(MessageT& message, const std::vector<uint8_t>& input) {
+bool decodeFromBuffer(MessageT& message, const uint8_t* buffer,
+                      size_t bufferLen) {
   message = MessageT();  // Reset the message to its default state
 
-  pb_istream_t stream = pb_istream_from_buffer(input.data(), input.size());
+  pb_istream_t stream = pb_istream_from_buffer(buffer, bufferLen);
   void* messagePtr = &message;
   return nanopb_helper::StructCodec<MessageT>::decode(&stream, nullptr,
                                                       &messagePtr);
+}
+
+template <typename MessageT>
+bool decodeFromVector(MessageT& message, const std::vector<uint8_t>& input) {
+  return decodeFromBuffer(message, input.data(), input.size());
 }
 
 }  // namespace nanopb_helper

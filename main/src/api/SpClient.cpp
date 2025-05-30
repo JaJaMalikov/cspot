@@ -1,5 +1,6 @@
 #include "api/SpClient.h"
 
+#include <fmt/format.h>
 #include <iostream>
 #include <memory>
 #include <tao/json.hpp>
@@ -80,6 +81,8 @@ bell::Result<> SpClient::putConnectState(
   if (httpResponse.getStatusCode().unwrap() != 200) {
     BELL_LOG(error, LOG_TAG, "Error while sending request: {}",
              httpResponse.getStatusCode().unwrap());
+    std::cout << "Response body: "
+              << httpResponse.getBodyStringView().getValue() << std::endl;
     return std::errc::bad_message;
   }
 
@@ -150,7 +153,8 @@ bell::Result<tao::json::value> SpClient::contextResolve(
 }
 
 bell::Result<bell::HTTPReader> SpClient::doRequest(
-    const std::string& requestUrl) {
+    bell::HTTPMethod method, const std::string& requestUrl) {
+  std::cout << requestUrl << std::endl;
 
   auto addrRes = sessionContext->credentialsResolver->getApAddress(
       CredentialsResolver::AddressType::SpClient);
@@ -174,8 +178,7 @@ bell::Result<bell::HTTPReader> SpClient::doRequest(
   auto clientToken = clientTokenRes.takeValue();
 
   auto response = bell::http::request(
-      bell::HTTPMethod::GET,
-      fmt::format("https://{}/{}", spClientAddress, requestUrl),
+      method, fmt::format("https://{}/{}", spClientAddress, requestUrl),
       {
           {"Client-Token", clientToken},
           {"Authorization", fmt::format("Bearer {}", accessToken)},
@@ -206,7 +209,8 @@ bell::Result<cspot_proto::Track> SpClient::trackMetadata(
     return std::errc::invalid_argument;
   }
 
-  auto res = doRequest(fmt::format("/metadata/4/track/", trackId.trackHex()));
+  auto res = doRequest(bell::http::Method::GET,
+                       fmt::format("metadata/4/track/{}", trackId.hexGid()));
   if (!res) {
     return res.getError();
   }
@@ -221,6 +225,16 @@ bell::Result<cspot_proto::Track> SpClient::trackMetadata(
   auto resultBytes = reader.getBodyBytes();
 
   cspot_proto::Track trackProto;
+
+  bool decodeRes = nanopb_helper::decodeFromBuffer(
+      trackProto,
+      reinterpret_cast<const uint8_t*>(reader.getBodyBytesPtr().unwrap()),
+      reader.getBodyBytesLength().unwrap());
+
+  if (!decodeRes) {
+    BELL_LOG(error, LOG_TAG, "Error while decoding track metadata");
+    return std::errc::bad_message;
+  }
 
   return trackProto;
 }

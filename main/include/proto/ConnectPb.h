@@ -59,10 +59,28 @@ struct DeviceInfo {
 NANOPB_STRUCT(cspot_proto::DeviceInfo, DeviceInfo_fields)
 
 namespace cspot_proto {
+struct ContextIndex {
+  int32_t page = 0;
+  int32_t track = 0;
+
+  static auto bindFields(ContextIndex* self, bool isDecode) {
+    _ContextIndex rawProto = ContextIndex_init_zero;
+    nanopb_helper::bindVarintField(rawProto.page, self->page, isDecode);
+    nanopb_helper::bindVarintField(rawProto.track, self->track, isDecode);
+    return rawProto;
+  }
+};
+}  // namespace cspot_proto
+NANOPB_STRUCT(cspot_proto::ContextIndex, ContextIndex_fields)
+
+namespace cspot_proto {
 struct ContextTrack {
   std::string uri;
   std::string uid;
   std::vector<uint8_t> gid;
+
+  // Not a part of protobuf, added for indexing purposes
+  cspot_proto::ContextIndex index;
 
   static auto bindFields(ContextTrack* self, bool isDecode) {
     _ContextTrack rawProto = ContextTrack_init_zero;
@@ -93,21 +111,6 @@ struct ContextPage {
 };
 }  // namespace cspot_proto
 NANOPB_STRUCT(cspot_proto::ContextPage, ContextPage_fields)
-
-namespace cspot_proto {
-struct ContextIndex {
-  int32_t page = 0;
-  int32_t track = 0;
-
-  static auto bindFields(ContextIndex* self, bool isDecode) {
-    _ContextIndex rawProto = ContextIndex_init_zero;
-    nanopb_helper::bindVarintField(rawProto.page, self->page, isDecode);
-    nanopb_helper::bindVarintField(rawProto.track, self->track, isDecode);
-    return rawProto;
-  }
-};
-}  // namespace cspot_proto
-NANOPB_STRUCT(cspot_proto::ContextIndex, ContextIndex_fields)
 
 namespace cspot_proto {
 struct Context {
@@ -268,11 +271,14 @@ namespace cspot_proto {
 struct Session {
   cspot_proto::Context context;
   std::string currentUid;
+  nanopb_helper::Optional<std::string> originalSessionId;
 
   static auto bindFields(Session* self, bool isDecode) {
     _Session rawProto = Session_init_zero;
     nanopb_helper::bindField(rawProto.context, self->context, isDecode);
     nanopb_helper::bindField(rawProto.current_uid, self->currentUid, isDecode);
+    nanopb_helper::bindField(rawProto.original_session_id,
+                             self->originalSessionId, isDecode);
     return rawProto;
   }
 };
@@ -303,7 +309,7 @@ struct PutStateRequest {
   MemberType memberType;
   bool isActive = false;
   PutStateReason putStateReason;
-  uint32_t mesasgeId = 0;
+  uint32_t messageId = 0;
   std::string lastCommandSentByDeviceId;
   uint32_t lastCommandMessageId = 0;
   uint64_t startedPlayingAt = 0;
@@ -319,7 +325,7 @@ struct PutStateRequest {
     nanopb_helper::bindField(rawProto.is_active, self->isActive, isDecode);
     nanopb_helper::bindVarintField(rawProto.put_state_reason,
                                    self->putStateReason, isDecode);
-    nanopb_helper::bindVarintField(rawProto.message_id, self->mesasgeId,
+    nanopb_helper::bindVarintField(rawProto.message_id, self->messageId,
                                    isDecode);
     nanopb_helper::bindField(rawProto.last_command_sent_by_device_id,
                              self->lastCommandSentByDeviceId, isDecode);

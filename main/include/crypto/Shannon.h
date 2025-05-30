@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdint>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 
 namespace cspot {
 // Implementation of the Shannon stream cipher, used for communication with the Spotify AP

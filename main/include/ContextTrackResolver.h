@@ -1,32 +1,36 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include "SessionContext.h"
 #include "api/SpClient.h"
+#include "proto/ConnectPb.h"
 
 namespace cspot {
 
 class ContextTrackResolver {
  public:
-  ContextTrackResolver(std::shared_ptr<SessionContext> sessionContext,
-                       std::shared_ptr<SpClient> spClients);
+  ContextTrackResolver(std::shared_ptr<SpClient> spClient,
+                       const std::string& rootContextUrl,
+                       const std::string& currentTrackUid,
+                       int maxPreviousTracksCount = 16,
+                       int maxNextTracksCount = 16,
+                       int trackUpdateThreshold = 8);
+  std::span<cspot_proto::ContextTrack> previousTracks();
+  std::span<cspot_proto::ContextTrack> nextTracks();
 
-  bell::Result<> resolveContext(const std::string& contextUrl,
-                                const std::string& currentTrackUid);
+  bell::Result<cspot_proto::ContextTrack> skipForward(
+      const cspot_proto::ContextTrack& track);
 
-  bell::Result<bool> updateTracks();
+  bell::Result<cspot_proto::ContextTrack> skipBackward(
+      const cspot_proto::ContextTrack& track);
 
-  static cspot_proto::ProvidedTrack contextTrackJsonToProvidedTrack(
-      const tao::json::value& contextTrackJson);
+  bell::Result<cspot_proto::ContextTrack> next();
+  bell::Result<cspot_proto::ContextTrack> previous();
 
  private:
   const char* LOG_TAG = "ContextTrackResolver";
 
-  static const int maxPreviousTracksCount = 5;
-  static const int maxNextTracksCount = 16;
-  static const int nextTracksThreshold = 8;
-
-  std::shared_ptr<SessionContext> sessionContext;
   std::shared_ptr<SpClient> spClient;
 
   // Represents a resolved context page, can either link to a page URL or be a root context
@@ -44,26 +48,13 @@ class ContextTrackResolver {
     }
   };
 
-  struct ResolverTrackIndex {
-    // Index of the currently played back track
-    // in the context page
-    size_t currentTrackIndex;
-    size_t currentTrackPageIndex;
-
-    // Index of the last track in the next tracks list
-    size_t tailTrackIndex;
-    size_t tailTrackPageIndex;
-  };
-
   std::string currentTrackUid;
-
-  std::optional<ResolverTrackIndex> trackIndex;
 
   std::string rootContextUrl;
   std::vector<ResolvedContextPage> resolvedContextPages;
 
-  std::vector<cspot_proto::ProvidedTrack> previousTracks;
-  std::vector<cspot_proto::ProvidedTrack> nextTracks;
+  std::queue<cspot_proto::ContextTrack> contextTrackQueue;
+  uint32_t currentTrackIndexInQueue = 0;
 
   bell::Result<> resolveRootContext(const std::string& contextUrl);
 

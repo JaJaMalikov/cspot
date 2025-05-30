@@ -1,6 +1,7 @@
 #include "crypto/Shannon.h"
 
 #include <cstddef>
+#include <climits>
 
 using namespace cspot;
 

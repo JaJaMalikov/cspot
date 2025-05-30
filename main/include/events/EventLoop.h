@@ -10,6 +10,7 @@
 #include <variant>
 
 #include "bell/utils/Task.h"
+#include "events/EventModels.h"
 
 namespace cspot {
 class EventLoop : public bell::Task {
@@ -17,10 +18,16 @@ class EventLoop : public bell::Task {
   EventLoop();
   ~EventLoop() {};
 
-  enum class EventType { DEALER_REQUEST, DEALER_MESSAGE };
+  enum class EventType {
+    DEALER_REQUEST,
+    DEALER_MESSAGE,
+    TRACKPROVIDER_UPDATED,
+    CURRENT_TRACK_METADATA
+  };
 
   // Define all possible event payload types
-  using EventPayload = std::variant<tao::json::value, std::monostate>;
+  using EventPayload =
+      std::variant<tao::json::value, std::monostate, CurrentTrackMetadata>;
 
   struct Event {
     EventType type;

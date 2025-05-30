@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <string>
 #include <vector>
 
 #include <mbedtls/bignum.h>

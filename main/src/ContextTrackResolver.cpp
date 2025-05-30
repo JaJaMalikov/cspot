@@ -1,5 +1,8 @@
 #include "ContextTrackResolver.h"
 #include "bell/Logger.h"
+#include "bell/http/Common.h"
+#include "proto/ConnectPb.h"
+#include "tao/json/from_string.hpp"
 
 using namespace cspot;
 
@@ -90,6 +93,14 @@ bell::Result<bool> ContextTrackResolver::updateTracks() {
   }
 
   return true;
+}
+
+std::optional<cspot_proto::ProvidedTrack>
+ContextTrackResolver::getCurrentTrack() const {
+  if (trackIndex.has_value()) {
+    return currentTrack;
+  }
+  return std::nullopt;
 }
 
 bell::Result<> ContextTrackResolver::resolveRootContext(
@@ -198,14 +209,17 @@ bell::Result<> ContextTrackResolver::resolveContextPage(
   BELL_LOG(info, LOG_TAG, "Resolving context page: {}",
            page.pageUrl.value_or(""));
 
-  auto res = spClient->hmRequest(page.pageUrl.value());
+  auto res = spClient->doRequest(bell::http::Method::GET,
+                                 page.pageUrl.value().substr(5));
   if (!res) {
     BELL_LOG(error, LOG_TAG, "Failed to resolve context page: {}",
              res.errorMessage());
     return res.getError();
   }
 
-  auto contextJson = res.takeValue();
+  auto reader = res.takeValue();
+  auto contextJson =
+      tao::json::from_string(reader.getBodyStringView().unwrap());
 
   if ((page.pageUrl == resolvedContextPages.back().pageUrl) &&
       (contextJson["next_page_url"].is_string_type())) {
@@ -227,11 +241,11 @@ bell::Result<> ContextTrackResolver::resolveContextPage(
 
 void ContextTrackResolver::iterateContextPage(
     const tao::json::value::array_t& tracks, ResolvedContextPage& page) {
-  size_t pageIdx = std::find(resolvedContextPages.begin(),
-                             resolvedContextPages.end(), page) -
-                   resolvedContextPages.begin();
+  int32_t pageIdx = std::find(resolvedContextPages.begin(),
+                              resolvedContextPages.end(), page) -
+                    resolvedContextPages.begin();
 
-  size_t trackIdx = 0;
+  int32_t trackIdx = 0;
   bool pushNextTracks = false;
   bool pushPreviousTracks = !trackIndex.has_value();
 
@@ -267,6 +281,8 @@ void ContextTrackResolver::iterateContextPage(
           .tailTrackIndex = trackIdx,  // This will be updated later
           .tailTrackPageIndex = pageIdx,
       };
+
+      currentTrack = contextTrackJsonToProvidedTrack(track);
 
       if (pushPreviousTracks) {
 

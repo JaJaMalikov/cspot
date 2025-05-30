@@ -1,7 +1,8 @@
 #pragma once
 
 // Protobufs
-#include "ConnectDeviceState.h"
+#include <random>
+#include "TrackProvider.h"
 #include "bell/Result.h"
 #include "connect.pb.h"
 
@@ -25,12 +26,15 @@ class ConnectStateHandler {
 
   std::shared_ptr<SessionContext> sessionContext;
   std::shared_ptr<SpClient> spClient;
-  std::shared_ptr<ConnectDeviceState> connectDeviceState;
+  std::shared_ptr<TrackProvider> trackProvider;
 
+
+  // Holds the protobuf state
   cspot_proto::PutStateRequest putStateRequestProto;
 
   void initialize();
 
-  bell::Result<> handleTransferCommand(std::string_view payloadDataStr);
+  bell::Result<> handleTransferCommand(std::string_view payloadDataStr,
+                                       const tao::json::value& options);
 };
 }  // namespace cspot

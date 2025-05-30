@@ -26,9 +26,8 @@ class SpClient {
                                  int retryCount = 3);
   bell::Result<tao::json::value> contextResolve(const std::string& contextUri);
 
-  // bell::Result<tao::json::value> radioApollo(const std::string& scope,
-  //                                            const std::string& contextUri,
-  //                                            bool autoplay, int pageSize);
+  bell::Result<bell::HTTPReader> doRequest(bell::HTTPMethod method,
+                                           const std::string& requestUrl);
 
   bell::Result<cspot_proto::Track> trackMetadata(const SpotifyId& trackId);
 
@@ -40,7 +39,5 @@ class SpClient {
 
   std::shared_ptr<SessionContext> sessionContext;
   std::vector<std::uint8_t> requestBuffer;
-
-  bell::Result<bell::HTTPReader> doRequest(const std::string& requestUrl);
 };
 }  // namespace cspot
