@@ -23,10 +23,10 @@ ConnectStateHandler::ConnectStateHandler(
     std::shared_ptr<SessionContext> sessionContext,
     std::shared_ptr<SpClient> spClient)
     : sessionContext(std::move(sessionContext)), spClient(std::move(spClient)) {
-  connectDeviceState =
-      std::make_shared<ConnectDeviceState>(sessionContext, spClient);
-  trackProvider = std::make_shared<TrackProvider>(sessionContext, spClient,
-                                                  connectDeviceState);
+  connectDeviceState = std::make_shared<ConnectDeviceState>(
+      this->sessionContext, this->spClient);
+  trackProvider =
+      std::make_shared<TrackProvider>(this->sessionContext, this->spClient);
 }
 
 bell::Result<> ConnectStateHandler::handlePlayerCommand(
@@ -50,6 +50,10 @@ bell::Result<> ConnectStateHandler::handlePlayerCommand(
   }
 
   return {};
+}
+
+bell::Result<> ConnectStateHandler::putState(PutStateReason reason) {
+  return this->connectDeviceState->putState(reason);
 }
 
 bell::Result<> ConnectStateHandler::handleTransferCommand(
@@ -85,11 +89,24 @@ bell::Result<> ConnectStateHandler::handleTransferCommand(
     return std::errc::bad_message;
   }
 
-  auto transferRes = trackProvider->transferContext(transferState);
+  auto stateLock = connectDeviceState->lock();
+
+  auto& playerState = connectDeviceState->getPlayerState();
+
+  auto transferRes = trackProvider->resolveContext(
+      transferState.current_session.context.url,
+      transferState.current_session.currentUid, playerState);
+
   if (!transferRes) {
     BELL_LOG(error, LOG_TAG, "Failed to transfer context: {}",
              transferRes.errorMessage());
     return transferRes;
+  }
+  for (const auto& track : playerState.prevTracks) {
+    BELL_LOG(info, LOG_TAG, "Previous track: {}", track.uid);
+  }
+  for (const auto& track : playerState.nextTracks) {
+    BELL_LOG(info, LOG_TAG, "Next track: {}", track.uid);
   }
 
   return {};

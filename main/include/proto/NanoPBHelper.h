@@ -45,6 +45,19 @@ bool pbDecodeVarint(pb_istream_t* stream, const pb_field_t* field, void** arg) {
   return true;
 }
 
+// Integer handling
+template <typename IntegerT>
+bool pbDecodeSvarint(pb_istream_t* stream, const pb_field_t* field,
+                     void** arg) {
+  auto* target = static_cast<IntegerT*>(*arg);
+  int64_t value;
+  if (!pb_decode_svarint(stream, &value)) {
+    return false;
+  }
+  *target = static_cast<IntegerT>(value);
+  return true;
+}
+
 template <typename IntegerT>
 bool pbEncodeVarint(pb_ostream_t* stream, const pb_field_t* field,
                     void* const* arg) {
@@ -53,6 +66,16 @@ bool pbEncodeVarint(pb_ostream_t* stream, const pb_field_t* field,
     return false;
   }
   return pb_encode_varint(stream, value);
+}
+
+template <typename IntegerT>
+bool pbEncodeSvarint(pb_ostream_t* stream, const pb_field_t* field,
+                     void* const* arg) {
+  const auto value = static_cast<int64_t>(*static_cast<const IntegerT*>(*arg));
+  if (!pb_encode_tag_for_field(stream, field)) {
+    return false;
+  }
+  return pb_encode_svarint(stream, value);
 }
 
 // Binding helpers
@@ -135,6 +158,28 @@ inline void bindField(pb_callback_t& pbField, float& field, bool isDecode) {
     pbField.funcs.decode = &pbDecodeFixed32;
   } else {
     pbField.funcs.encode = &pbEncodeFixed32;
+  }
+
+  pbField.arg = &field;
+}
+
+// int32_t type
+inline void bindField(pb_callback_t& pbField, int32_t& field, bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeSvarint<int32_t>;
+  } else {
+    pbField.funcs.encode = &pbEncodeSvarint<int32_t>;
+  }
+
+  pbField.arg = &field;
+}
+
+// int64_t type
+inline void bindField(pb_callback_t& pbField, int64_t& field, bool isDecode) {
+  if (isDecode) {
+    pbField.funcs.decode = &pbDecodeSvarint<int64_t>;
+  } else {
+    pbField.funcs.encode = &pbEncodeSvarint<int64_t>;
   }
 
   pbField.arg = &field;
@@ -247,6 +292,18 @@ struct StructCodec {
       pbField.funcs.encode =                                                   \
           &nanopb_helper::StructCodec<StructName>::encodeSubmessage;           \
     }                                                                          \
+    pbField.arg = &field;                                                      \
+  }                                                                            \
+  inline void bindField(pb_callback_t& pbField,                                \
+                        nanopb_helper::Optional<StructName>& field,            \
+                        bool isDecode) {                                       \
+    bindField(field.wrappedCallback, field.value, isDecode);                   \
+    if (isDecode) {                                                            \
+      pbField.funcs.decode = &Optional<StructName>::decode;                    \
+    } else {                                                                   \
+      pbField.funcs.encode = &Optional<StructName>::encode;                    \
+    }                                                                          \
+                                                                               \
     pbField.arg = &field;                                                      \
   }                                                                            \
   inline void bindField(pb_callback_t& pbField,                                \

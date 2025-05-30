@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "ConnectDeviceState.h"
+#include "ConnectStateHandler.h"
 #include "LoginBlob.h"
 #include "SessionContext.h"
 #include "api/DealerClient.h"
@@ -26,7 +26,7 @@ class Session {
   std::shared_ptr<SessionContext> sessionContext;
   std::shared_ptr<DealerClient> dealerClient;
   std::shared_ptr<SpClient> spClient;
-  std::shared_ptr<ConnectDeviceState> connectDeviceState;
+  std::shared_ptr<ConnectStateHandler> connectStateHandler;
 
   void handleDealerMessage(EventLoop::Event&& event);
   void handleDealerRequest(EventLoop::Event&& event);

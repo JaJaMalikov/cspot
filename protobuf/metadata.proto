@@ -1,35 +1,44 @@
 syntax = "proto2";
 
+import "nanopb.proto";
+
 message AudioFile {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     optional bytes file_id = 1;
     optional AudioFormat format = 2;
 }
 
 message Restriction {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     optional string countries_allowed = 0x2;
     optional string countries_forbidden = 0x3;
 }
 
 message Image {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     optional bytes file_id = 0x1;
 }
 
 message ImageGroup {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     repeated Image image = 0x1;
 }
 
 message Album {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     optional bytes gid = 0x1;
     optional string name = 0x2;
     optional ImageGroup cover_group = 0x11;
 }
 
 message Artist {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     optional bytes gid = 0x1;
     optional string name = 0x2;
 }
 
 message Track {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     optional bytes gid = 1;
     optional string name = 2;
     optional sint32 number = 5;
@@ -43,6 +52,7 @@ message Track {
 }
 
 message Episode {
+    option (nanopb_msgopt).type = FT_CALLBACK;
     optional bytes gid = 1;
     optional string name = 2;
     optional sint32 duration = 7;

@@ -21,8 +21,8 @@ cspot::Session::Session(std::shared_ptr<LoginBlob> loginBlob)
   // Prepare the dealer client
   dealerClient = std::make_shared<DealerClient>(sessionContext);
   spClient = std::make_shared<SpClient>(sessionContext);
-  connectDeviceState =
-      std::make_shared<ConnectDeviceState>(sessionContext, spClient);
+  connectStateHandler =
+      std::make_shared<ConnectStateHandler>(sessionContext, spClient);
 
   sessionContext->eventLoop->registerHandler(
       EventLoop::EventType::DEALER_MESSAGE,
@@ -60,12 +60,14 @@ void cspot::Session::handleDealerMessage(EventLoop::Event&& event) {
     BELL_LOG(info, LOG_TAG, "Session ID: {}", *sessionId);
 
     // Announce spotify connect state
-    auto res = connectDeviceState->putState(PutStateReason_NEW_CONNECTION);
+    auto res = connectStateHandler->putState(PutStateReason_NEW_CONNECTION);
     if (!res) {
       BELL_LOG(error, LOG_TAG, "Failed to announce connect state: {}",
                res.errorMessage());
       return;
     }
+  } else {
+    BELL_LOG(info, LOG_TAG, "Received message with URI: {}", *uri);
   }
 }
 
@@ -91,7 +93,7 @@ void cspot::Session::handleDealerRequest(EventLoop::Event&& event) {
   bool requestSuccess = false;
 
   if (messageIdent == "hm://connect-state/v1/player/command") {
-    auto res = connectDeviceState->handlePlayerCommand(messageJson);
+    auto res = connectStateHandler->handlePlayerCommand(messageJson);
     if (!res) {
       BELL_LOG(error, LOG_TAG, "Failed to handle player command: {}",
                res.errorMessage());

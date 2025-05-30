@@ -101,8 +101,8 @@ struct ContextIndex {
 
   static auto bindFields(ContextIndex* self, bool isDecode) {
     _ContextIndex rawProto = ContextIndex_init_zero;
-    nanopb_helper::bindField(rawProto.page, self->page, isDecode);
-    nanopb_helper::bindField(rawProto.track, self->track, isDecode);
+    nanopb_helper::bindVarintField(rawProto.page, self->page, isDecode);
+    nanopb_helper::bindVarintField(rawProto.track, self->track, isDecode);
     return rawProto;
   }
 };

@@ -37,6 +37,8 @@ void ConnectDeviceState::initialize() {
   deviceInfo.deviceType = DeviceType_SPEAKER;
   deviceInfo.deviceSoftwareVersion = deviceSoftwareVersion;
   deviceInfo.deviceId = sessionContext->loginBlob->getDeviceId();
+  deviceInfo.clientId =
+      "65b708073fc0480ea92a077233ca87bd";  // Spotify client ID
   deviceInfo.spircVersion = spircVersion;
 
   auto& capabilities = deviceInfo.capabilities.rawProto;
@@ -61,6 +63,7 @@ void ConnectDeviceState::initialize() {
   capabilities.supports_command_request = true;
   capabilities.is_voice_enabled = false;
   capabilities.needs_full_player_state = false;
+  capabilities.supports_set_options_command = true;
   capabilities.supports_gzip_pushes = false;  // TODO: Should we support this?
   capabilities.has_supports_hifi = false;
   deviceInfo.capabilities.supportedTypes = supportedTypes;

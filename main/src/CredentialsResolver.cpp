@@ -21,7 +21,7 @@ using namespace cspot;
 namespace {
 // Endpoints
 const std::string apResolveUrl =
-    "https://apresolve.spotify.com/?type=spclient&type=dealer&type=accesspoint";
+    "https://apresolve.spotify.com/?type=spclient&type=dealer-g2&type=accesspoint";
 const std::string clientTokenUrl =
     "https://clienttoken.spotify.com/v1/clienttoken";
 
@@ -35,7 +35,7 @@ const std::string accessTokenScopes =
 
 // JSON keys
 const std::string accessPointKey = "accesspoint";
-const std::string dealerKey = "dealer";
+const std::string dealerKey = "dealer-g2";
 const std::string spClientKey = "spclient";
 }  // namespace
 

@@ -6,7 +6,6 @@
 #include "connect.pb.h"
 
 #include "SessionContext.h"
-#include "TrackProvider.h"
 #include "api/SpClient.h"
 
 namespace cspot {
@@ -22,12 +21,15 @@ class ConnectStateHandler {
       PutStateReason reason = PutStateReason_PLAYER_STATE_CHANGED);
 
  private:
-  const char* LOG_TAG = "ConnectDeviceState";
+  const char* LOG_TAG = "ConnectStateHandler";
 
   std::shared_ptr<SessionContext> sessionContext;
   std::shared_ptr<SpClient> spClient;
-  std::shared_ptr<TrackProvider> trackProvider;
   std::shared_ptr<ConnectDeviceState> connectDeviceState;
+
+  cspot_proto::PutStateRequest putStateRequestProto;
+
+  void initialize();
 
   bell::Result<> handleTransferCommand(std::string_view payloadDataStr);
 };

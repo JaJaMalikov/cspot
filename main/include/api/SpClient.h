@@ -8,10 +8,13 @@
 #include <bell/Result.h>
 
 // Protobufs
+#include "bell/http/Reader.h"
 #include "connect.pb.h"
 
 #include "SessionContext.h"
 #include "proto/ConnectPb.h"
+#include "proto/MetadataPb.h"
+#include "proto/SpotifyId.h"
 
 namespace cspot {
 class SpClient {
@@ -23,16 +26,21 @@ class SpClient {
                                  int retryCount = 3);
   bell::Result<tao::json::value> contextResolve(const std::string& contextUri);
 
-  bell::Result<tao::json::value> hmRequest(const std::string& request);
+  // bell::Result<tao::json::value> radioApollo(const std::string& scope,
+  //                                            const std::string& contextUri,
+  //                                            bool autoplay, int pageSize);
 
-  bell::Result<tao::json::value> radioApollo(const std::string& scope,
-                                             const std::string& contextUri,
-                                             bool autoplay, int pageSize);
+  bell::Result<cspot_proto::Track> trackMetadata(const SpotifyId& trackId);
+
+  bell::Result<cspot_proto::Episode> episodeMetadata(
+      const SpotifyId& episodeId);
 
  private:
   const char* LOG_TAG = "SpClient";
 
   std::shared_ptr<SessionContext> sessionContext;
   std::vector<std::uint8_t> requestBuffer;
+
+  bell::Result<bell::HTTPReader> doRequest(const std::string& requestUrl);
 };
 }  // namespace cspot
