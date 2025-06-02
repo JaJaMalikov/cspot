@@ -16,7 +16,6 @@ TEST_CASE("MiscSpotifyApi tests", "[MiscSpotifyApi]") {
   // // cspot::ApConnection apConnection(url);
   auto loginBlob = std::make_shared<cspot::LoginBlob>("cspottest");
 
-  // return;
 
   loginBlob->authenticateZeroconfString(queryStrMock);
 
@@ -32,14 +31,14 @@ TEST_CASE("MiscSpotifyApi tests", "[MiscSpotifyApi]") {
   // authenticator->authenticateZeroconf(queryStrMock);
   // authenticator->connectStoredZeroconfBlob();
 
-  return;
+  // return;
   /*
   auto httpServer = std::make_shared<bell::http::Server>();
 
   // Get info handler
   httpServer->registerGet(
       "/spotify_handler",
-      [&sessionCredentials](
+      [&loginBlob](
           const std::unique_ptr<bell::http::Reader>& requestReader,
           const std::unique_ptr<bell::http::Writer>& responseWriter,
           const auto& routeParams) {
@@ -48,7 +47,7 @@ TEST_CASE("MiscSpotifyApi tests", "[MiscSpotifyApi]") {
 
         if (queryParams.find("action") != queryParams.end() &&
             queryParams["action"] == "getInfo") {
-          auto zeroConfString = sessionCredentials->buildZeroconfJSONResponse();
+          auto zeroConfString = loginBlob->buildZeroconfJSONResponse();
           responseWriter->writeResponseWithBody(
               200, {{"Content-Type", "application/json"}}, zeroConfString);
         } else {
@@ -58,7 +57,7 @@ TEST_CASE("MiscSpotifyApi tests", "[MiscSpotifyApi]") {
 
   httpServer->registerPost(
       "/spotify_handler",
-      [&sessionCredentials](
+      [&loginBlob](
           const std::unique_ptr<bell::http::Reader>& requestReader,
           const std::unique_ptr<bell::http::Writer>& responseWriter,
           const auto& routeParams) {
@@ -73,7 +72,7 @@ TEST_CASE("MiscSpotifyApi tests", "[MiscSpotifyApi]") {
         if (queryParams.find("action") != queryParams.end() &&
             queryParams["action"] == "addUser") {
 
-          auto zeroConfString = sessionCredentials->buildZeroconfJSONResponse();
+          auto zeroConfString = loginBlob->buildZeroconfJSONResponse();
           responseWriter->writeResponseWithBody(
               200, {{"Content-Type", "application/json"}}, zeroConfString);
         } else {
@@ -84,7 +83,7 @@ TEST_CASE("MiscSpotifyApi tests", "[MiscSpotifyApi]") {
   httpServer->listen(2139);
   auto service =  // Register mdns service, for spotify to find us
       bell::mdns::getDefaultManager()->advertise(
-          sessionCredentials->getDeviceName(), "_spotify-connect._tcp", "", "",
+          loginBlob->getDeviceName(), "_spotify-connect._tcp", "", "",
           2139,
           {{"VERSION", "1.0"}, {"CPath", "/spotify_handler"}, {"Stack", "SP"}});
 

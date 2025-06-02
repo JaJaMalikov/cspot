@@ -25,52 +25,54 @@ class TrackProvider {
   /**
    * @brief sets the current track and context. This will completely replace the current context and track, and reset the queue.
    */
-  bell::Result<> loadTrackAndContext(const SpotifyId& trackId,
+  bell::Result<> loadTrackAndContext(std::optional<std::string> trackUid,
+                                     std::optional<std::string> trackUri,
                                      const cspot_proto::Context& context);
 
   std::optional<cspot_proto::ProvidedTrack> currentTrack();
 
   std::optional<cspot_proto::ContextIndex> currentContextIndex();
 
-  std::vector<cspot_proto::ProvidedTrack> getNextTracks();
-  std::vector<cspot_proto::ProvidedTrack> getPreviousTracks();
+  bell::Result<> skipToNextTrack(cspot_proto::ContextTrack* track = nullptr);
 
-  void skipToNextTrack(
-      std::optional<cspot_proto::ContextTrack> track = std::nullopt);
+  bell::Result<> skipToPreviousTrack(
+      cspot_proto::ContextTrack* track = nullptr);
 
-  void skipToPreviousTrack(
-      std::optional<cspot_proto::ContextTrack> track = std::nullopt);
+  // Nanopb callback for encoding next tracks in the playback state
+  static bool pbEncodeNextTracks(pb_ostream_t* stream, const pb_field_t* field,
+                                 void* const* arg) {
+    return static_cast<TrackProvider*>(*arg)->encodePbTracks(stream, field,
+                                                             false);
+  }
+
+  // Nanopb callback for encoding previous tracks in the playback state
+  static bool pbEncodePreviousTracks(pb_ostream_t* stream,
+                                     const pb_field_t* field,
+                                     void* const* arg) {
+    return static_cast<TrackProvider*>(*arg)->encodePbTracks(stream, field,
+                                                             true);
+  }
 
  private:
   const char* LOG_TAG = "TrackProvider";
 
   std::shared_ptr<SessionContext> sessionContext;
   std::shared_ptr<SpClient> spClient;
-  std::shared_ptr<ContextTrackResolver> contextTrackResolver;
+  std::unique_ptr<ContextTrackResolver> contextTrackResolver;
 
-  std::vector<cspot_proto::ProvidedTrack> queueTracks;
+  // Whether we are currently playing a queue
+  bool isPlayingQueue = false;
 
-  struct ProviderState {
-    // Contains information about the current track
-    cspot_proto::ProvidedTrack currentTrack;
+  // Contains manually queued tracks, outside of the context
+  std::vector<cspot_proto::ContextTrack> trackQueue;
 
-    // Contains information about index of current track in the context
-    cspot_proto::ContextIndex currentContextIndex;
+  std::vector<cspot_proto::ProvidedTrack> previousTracks;
+  std::vector<cspot_proto::ProvidedTrack> nextTracks;
 
-    // Contains the UID of the current track in context
-    std::string currentContextUid;
+  // Index of the current track in the track queue
+  uint32_t trackQueueIndex = 0;
 
-    // Whether we are currently playing a queue
-    bool isPlayingQueue = false;
-
-    // Contains manually queued tracks, outside of the context
-    std::vector<cspot_proto::ProvidedTrack> trackQueue;
-
-    // Contains next tracks in the context
-    std::vector<cspot_proto::ProvidedTrack> nextCtxTracks;
-    std::vector<cspot_proto::ProvidedTrack> prevCtxTracks;
-  };
-
-  ProviderState providerState;
+  bool encodePbTracks(pb_ostream_t* stream, const pb_field_t* field,
+                      bool isPreviousTracks);
 };
 }  // namespace cspot

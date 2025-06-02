@@ -1,10 +1,12 @@
 #include "ContextTrackResolver.h"
 
+#include <span>
 #include <system_error>
 
 #include "bell/Logger.h"
 #include "bell/http/Common.h"
 #include "picojson.h"
+#include "proto/ConnectPb.h"
 
 using namespace cspot;
 
@@ -56,12 +58,13 @@ class ContextPageParseContext : public picojson::null_parse_context {
     if (currentObjectKey == "tracks") {
       _parse(contextTrackParser, in);
 
+      ContextTrackResolver::TrackId trackId(currentTrack.uid, currentTrack.uri);
+
       if (idx == 0) {
-        contextPage->firstUid =
-            currentTrack.uid;  // Store the first track UID in the page
+        contextPage->firstId = trackId;
       }
 
-      contextPage->lastUid = currentTrack.uid;  // Update last UID
+      contextPage->lastId = trackId;
 
       // Check if running from the root context
       contextPage->isInRoot = isRoot;
@@ -72,7 +75,7 @@ class ContextPageParseContext : public picojson::null_parse_context {
 
       bool addTrackToCache = true;
 
-      if (currentTrack.uid == parseState->targetTrackUid) {
+      if (trackId == parseState->targetTrackId) {
         // If this is the current track, update the index in the cache
         parseState->foundTrackIndex.emplace(
             static_cast<uint32_t>(parseState->tracks.size()));
@@ -176,8 +179,6 @@ class ContextRootParseContext : public picojson::null_parse_context {
       // Parse the context page
       _parse(pageCtx, in);
 
-      std::cout << "Parsed context page " << idx << " with URL: "
-                << contextPages->at(idx).pageUrl.value_or("N/A") << std::endl;
       return true;
     }
 
@@ -202,20 +203,22 @@ class ContextRootParseContext : public picojson::null_parse_context {
 }  // namespace
 
 ContextTrackResolver::ContextTrackResolver(std::shared_ptr<SpClient> spClient,
-                                           std::string rootContextUrl,
-                                           std::string currentTrackUid,
+
                                            uint32_t maxPreviousTracksCount,
                                            uint32_t maxNextTracksCount,
                                            uint32_t trackUpdateThreshold)
     : spClient(std::move(spClient)),
-      rootContextUrl(std::move(rootContextUrl)),
-      currentTrackUid(std::move(currentTrackUid)),
       maxPreviousTracksCount(maxPreviousTracksCount),
       maxNextTracksCount(maxNextTracksCount),
-      trackUpdateThreshold(trackUpdateThreshold) {
+      trackUpdateThreshold(trackUpdateThreshold) {}
 
-  this->rootContextUrl =
-      this->rootContextUrl.substr(10);  // Remove "context://"
+void ContextTrackResolver::updateContext(
+    const std::string& rootContextUrl,
+    std::optional<std::string>& currentTrackUid,
+    std::optional<std::string>& currentTrackUri) {
+  this->rootContextUrl = rootContextUrl.substr(10);  // remove context://
+  this->currentTrackId.uid = currentTrackUid;
+  this->currentTrackId.uri = currentTrackUri;
 }
 
 bell::Result<cspot_proto::ContextTrack>
@@ -226,7 +229,67 @@ ContextTrackResolver::getCurrentTrack() {
              res.errorMessage());
     return res.getError();
   }
-  return std::errc::executable_format_error;
+
+  return trackCache[currentTrackInCacheIndex.value()];
+}
+
+tcb::span<cspot_proto::ContextTrack> ContextTrackResolver::previousTracks() {
+  if (!currentTrackInCacheIndex.has_value()) {
+    return {};
+  }
+  return {trackCache.data(), currentTrackInCacheIndex.value()};
+}
+
+tcb::span<cspot_proto::ContextTrack> ContextTrackResolver::nextTracks() {
+  if (!currentTrackInCacheIndex.has_value()) {
+    return {};
+  }
+  return {trackCache.data() + currentTrackInCacheIndex.value() + 1,
+          trackCache.size() - currentTrackInCacheIndex.value() - 1};
+}
+
+bell::Result<cspot_proto::ContextTrack> ContextTrackResolver::next() {
+  auto res = ensureContextTracks();
+  if (!res) {
+    BELL_LOG(error, LOG_TAG, "Failed to ensure context tracks: {}",
+             res.errorMessage());
+    return res.getError();
+  }
+
+  if (currentTrackInCacheIndex.value() + 1 >= trackCache.size()) {
+    BELL_LOG(error, LOG_TAG, "No next track available");
+    return std::errc::no_message_available;
+  }
+
+  if (currentTrackInCacheIndex.value() > trackUpdateThreshold) {
+    // Erase oldest track
+    trackCache.erase(trackCache.begin());
+  } else {
+    currentTrackInCacheIndex.value()++;
+  }
+
+  return trackCache[currentTrackInCacheIndex.value()];
+}
+
+bell::Result<cspot_proto::ContextTrack> ContextTrackResolver::previous() {
+  auto res = ensureContextTracks();
+  if (!res) {
+    BELL_LOG(error, LOG_TAG, "Failed to ensure context tracks: {}",
+             res.errorMessage());
+    return res.getError();
+  }
+
+  if (currentTrackInCacheIndex.value() + 1 >= trackCache.size()) {
+    BELL_LOG(error, LOG_TAG, "No next track available");
+    return std::errc::no_message_available;
+  }
+
+  trackCache.erase(trackCache.end());
+
+  // Go to previous track
+  currentTrackInCacheIndex.value() -= 1;
+
+  return trackCache[currentTrackInCacheIndex.value()];
 }
 
 bell::Result<> ContextTrackResolver::ensureContextTracks() {
@@ -243,55 +306,63 @@ bell::Result<> ContextTrackResolver::ensureContextTracks() {
     updateTracksFromParseState();
   }
 
-  if ((trackCache.size() - currentTrackInCacheIndex.value()) <
-      trackUpdateThreshold) {
-          BELL_LOG(debug, LOG_TAG,
-                 "Not enough tracks after current track, resolving more tracks");
+  if (((trackCache.size() - currentTrackInCacheIndex.value()) <
+       trackUpdateThreshold)) {
+    BELL_LOG(debug, LOG_TAG,
+             "Not enough tracks after current track, resolving more tracks");
     auto& lastTrackIndex = trackCache.back().index;
     uint32_t pageIndex = lastTrackIndex.page;
-    if (resolvedContextPages[pageIndex].lastUid == trackCache.back().uid) {
+    if (resolvedContextPages[pageIndex].lastId == trackCache.back()) {
       // Skip page, as we are on the last track
       pageIndex++;
-      if (pageIndex >= resolvedContextPages.size()) {
-        BELL_LOG(error, LOG_TAG,
-                 "No more pages to resolve, cannot find current track index");
-        return {};
-        ;
-      }
-
-      resetContextParseState();
-      auto res = resolveContextPage(resolvedContextPages[pageIndex]);
-      if (!res) {
-        BELL_LOG(error, LOG_TAG, "Failed to resolve context page: {}",
-                 res.errorMessage());
-        return res.getError();
-      }
-
-      updateTracksFromParseState();
-    } else if (currentTrackInCacheIndex.value() < trackUpdateThreshold) {
-        BELL_LOG(debug, LOG_TAG,
-               "Not enough tracks before current track, resolving more tracks");
-
-      auto& firstTrackIndex = trackCache.front().index;
-      if (resolvedContextPages[firstTrackIndex.page].firstUid ==
-          trackCache.front().uid) {
-        // Skip page, as we are on the first track
-        if (firstTrackIndex.page == 0) {
-          return {};  // No previous page to resolve
-        }
-        pageIndex = firstTrackIndex.page - 1;
-      }
-
-      resetContextParseState();
-      auto res = resolveContextPage(resolvedContextPages[pageIndex]);
-      if (!res) {
-        BELL_LOG(error, LOG_TAG, "Failed to resolve context page: {}",
-                 res.errorMessage());
-        return res.getError();
-      }
-
-      updateTracksFromParseState();
     }
+    if (pageIndex >= resolvedContextPages.size()) {
+      BELL_LOG(error, LOG_TAG,
+               "No more pages to resolve, cannot find current track index");
+      return {};
+    }
+
+    resetContextParseState();
+    auto res = resolvedContextPages[pageIndex].isInRoot
+                   ? resolveRootContext()
+                   : resolveContextPage(resolvedContextPages[pageIndex]);
+    if (!res) {
+      BELL_LOG(error, LOG_TAG, "Failed to resolve context page: {}",
+               res.errorMessage());
+      return res.getError();
+    }
+
+    updateTracksFromParseState();
+  } else if (currentTrackInCacheIndex.value() < trackUpdateThreshold &&
+             !(trackCache.front().index.page == 0 &&
+               trackCache.front().index.track == 0)) {
+    BELL_LOG(debug, LOG_TAG,
+             "Not enough tracks before current track, resolving more tracks");
+
+    auto& firstTrackIndex = trackCache.front().index;
+
+    uint32_t pageIndex = firstTrackIndex.page;
+
+    if (resolvedContextPages[firstTrackIndex.page].firstId ==
+        trackCache.front()) {
+      // Skip page, as we are on the first track
+      if (firstTrackIndex.page == 0) {
+        return {};  // No previous page to resolve
+      }
+      pageIndex = firstTrackIndex.page - 1;
+    }
+
+    resetContextParseState();
+    auto res = resolvedContextPages[pageIndex].isInRoot
+                   ? resolveRootContext()
+                   : resolveContextPage(resolvedContextPages[pageIndex]);
+    if (!res) {
+      BELL_LOG(error, LOG_TAG, "Failed to resolve context page: {}",
+               res.errorMessage());
+      return res.getError();
+    }
+
+    updateTracksFromParseState();
   }
 
   return {};
@@ -304,7 +375,7 @@ void ContextTrackResolver::resetContextParseState() {
         .foundTrackIndex = std::nullopt,
         .maxNextTracksCount = maxNextTracksCount,
         .maxPreviousTracksCount = maxPreviousTracksCount,
-        .targetTrackUid = currentTrackUid,
+        .targetTrackId = currentTrackId,
         .tracks = {},
     };
   } else if ((trackCache.size() - currentTrackInCacheIndex.value()) <
@@ -312,12 +383,13 @@ void ContextTrackResolver::resetContextParseState() {
     // If we are close to the end of the cache, we need to fetch more tracks
     contextParseState = {
         .fetchWindow = ContextFetchWindow::AfterID,
-        .foundTrackIndex = std::nullopt,
+        .foundTrackIndex = currentTrackInCacheIndex,
         .maxNextTracksCount = maxNextTracksCount,
         .maxPreviousTracksCount = 0,
-        .targetTrackUid = trackCache.back().uid,
+        .targetTrackId = {trackCache.back().uid, trackCache.back().uri},
         .tracks = {},
     };
+
   } else if (currentTrackInCacheIndex.value() < trackUpdateThreshold) {
     // Not enough previous tracks, fetch more
     contextParseState = {
@@ -325,7 +397,7 @@ void ContextTrackResolver::resetContextParseState() {
         .foundTrackIndex = currentTrackInCacheIndex,
         .maxNextTracksCount = 0,
         .maxPreviousTracksCount = maxPreviousTracksCount,
-        .targetTrackUid = trackCache.front().uid,
+        .targetTrackId = {trackCache.front().uid, trackCache.front().uri},
         .tracks = {},
     };
   } else {
@@ -334,8 +406,7 @@ void ContextTrackResolver::resetContextParseState() {
 }
 
 void ContextTrackResolver::updateTracksFromParseState() {
-    BELL_LOG(debug, LOG_TAG,
-           "Updating tracks from parse state, found index: {}",
+  BELL_LOG(debug, LOG_TAG, "Updating tracks from parse state, found index: {}",
            contextParseState.foundTrackIndex.has_value()
                ? std::to_string(contextParseState.foundTrackIndex.value())
                : "N/A");
@@ -343,6 +414,8 @@ void ContextTrackResolver::updateTracksFromParseState() {
     // If we are in after ID mode, we only add tracks after the found index
     trackCache.insert(trackCache.end(), contextParseState.tracks.begin(),
                       contextParseState.tracks.end());
+    BELL_LOG(debug, LOG_TAG, "Added tracks after found index, size: {}",
+             trackCache.size());
   } else if (contextParseState.fetchWindow == ContextFetchWindow::BeforeID) {
     // If we are in before ID mode, we only add tracks before the found index
     trackCache.insert(trackCache.begin(), contextParseState.tracks.begin(),
@@ -367,13 +440,9 @@ bell::Result<> ContextTrackResolver::resolveRootContext() {
 
   auto* rawDataStream = reader.getValue().getStream();
 
-  // Prepare the parse state
-  ContextTrackParseState parserState = {
-      .targetTrackUid = currentTrackUid,
-  };
-
   resetContextParseState();
-  auto parseCtx = ContextRootParseContext(&parserState, &resolvedContextPages);
+  auto parseCtx =
+      ContextRootParseContext(&contextParseState, &resolvedContextPages);
   std::string parseError;
   picojson::_parse(parseCtx,
                    std::istreambuf_iterator<char>(rawDataStream->rdbuf()),
@@ -392,11 +461,13 @@ bell::Result<> ContextTrackResolver::resolveRootContext() {
   }
 
   BELL_LOG(info, LOG_TAG, "Root context resolved successfully");
-  while (!parserState.foundTrackIndex.has_value()) {
+  uint32_t nextPageIndex = contextParseState.tracks.back().index.page;
+
+  while (!contextParseState.foundTrackIndex.has_value()) {
+    nextPageIndex++;
     BELL_LOG(info, LOG_TAG,
              "Current track index not found, resolving next page");
-    uint32_t nextPageIndex = parserState.tracks.back().index.page + 1;
-    std::cout << "Next page index: " << nextPageIndex << std::endl;
+    BELL_LOG(info, LOG_TAG, "Next page index: {}", nextPageIndex);
     if (nextPageIndex >= resolvedContextPages.size()) {
       BELL_LOG(error, LOG_TAG,
                "No more pages to resolve, cannot find current track index");
@@ -418,10 +489,9 @@ bell::Result<> ContextTrackResolver::resolveRootContext() {
     }
   }
 
-  BELL_LOG(info, LOG_TAG,
-           "Current track index found: {}",
-           parserState.foundTrackIndex.has_value()
-               ? std::to_string(parserState.foundTrackIndex.value())
+  BELL_LOG(info, LOG_TAG, "Current track index found: {}",
+           contextParseState.foundTrackIndex.has_value()
+               ? std::to_string(contextParseState.foundTrackIndex.value())
                : "N/A");
 
   return {};
@@ -444,12 +514,7 @@ bell::Result<> ContextTrackResolver::resolveContextPage(
 
   auto* rawDataStream = reader.getValue().getStream();
 
-  // Prepare the parse state
-  ContextTrackParseState parserState = {
-      .targetTrackUid = currentTrackUid,
-  };
-
-  auto parseCtx = ContextPageParseContext(&parserState, &page);
+  auto parseCtx = ContextPageParseContext(&contextParseState, &page);
   std::string parseError;
   picojson::_parse(parseCtx,
                    std::istreambuf_iterator<char>(rawDataStream->rdbuf()),

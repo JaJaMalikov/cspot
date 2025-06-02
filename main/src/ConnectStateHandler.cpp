@@ -124,6 +124,12 @@ void ConnectStateHandler::initialize() {
 
   auto& playerState = deviceProto.playerState;
   playerState.isSystemInitiated = true;
+
+  // Assign next and previous tracks encode callbacks
+  playerState.nextTracks.funcs.encode = TrackProvider::pbEncodeNextTracks;
+  playerState.prevTracks.funcs.encode = TrackProvider::pbEncodePreviousTracks;
+  playerState.nextTracks.arg = trackProvider.get();
+  playerState.prevTracks.arg = trackProvider.get();
 }
 
 bell::Result<> ConnectStateHandler::handlePlayerCommand(
@@ -142,6 +148,9 @@ bell::Result<> ConnectStateHandler::handlePlayerCommand(
     BELL_LOG(info, LOG_TAG, "Received transfer command");
     std::string_view payloadDataStr = command.as<std::string_view>("data");
     return handleTransferCommand(payloadDataStr, command["options"]);
+  } else if (endpoint == "skip_next") {
+    BELL_LOG(info, LOG_TAG, "Received skip_next command");
+    return handleSkipNextCommand();
   } else {
     BELL_LOG(info, LOG_TAG, "Received unknown command: {}", endpoint);
     return std::errc::operation_not_supported;
@@ -223,7 +232,7 @@ bell::Result<> ConnectStateHandler::handleTransferCommand(
   playerState.isPaused = shouldPause;
   playerState.contextUri = transferState.current_session.context.uri;
   playerState.contextUrl = transferState.current_session.context.url;
-
+  playerState.options = transferState.options;
   playerState.track.uid = transferState.current_session.currentUid;
   playerState.position = 0;
   playerState.positionAsOfTimestamp =
@@ -231,41 +240,60 @@ bell::Result<> ConnectStateHandler::handleTransferCommand(
   putStateRequestProto.startedPlayingAt = transferState.playback.timestamp;
   putStateRequestProto.hasBeenPlayingForMs = 0;
 
-  auto currentTrackid =
-      SpotifyId(SpotifyIdType::Track, transferState.playback.currentTrack.gid);
-  playerState.track.uri = currentTrackid.uri;
-  playerState.track.provider = "context";
+  trackProvider->setQueue(transferState.queue);
 
-  auto resolver = std::make_unique<ContextTrackResolver>(
-      this->spClient, transferState.current_session.context.url,
-      transferState.current_session.currentUid);
+  SpotifyIdType trackType =
+      SpotifyId::getTypeFromContext(transferState.current_session.context.uri);
+  SpotifyId trackId =
+      SpotifyId(trackType, transferState.playback.currentTrack.gid);
 
-  auto resolveRes = resolver->getCurrentTrack();
-  if (!resolveRes) {
-    BELL_LOG(error, LOG_TAG, "Failed to resolve current track: {}",
-             resolveRes.errorMessage());
-    return resolveRes.getError();
+  auto provideRes = trackProvider->loadTrackAndContext(
+      transferState.current_session.currentUid, trackId.uri,
+      transferState.current_session.context);
+  if (!provideRes) {
+    BELL_LOG(error, LOG_TAG, "Failed to provide current track: {}",
+             provideRes.errorMessage());
+    return provideRes.getError();
   }
 
-  // trackProvider->setQueue(transferState.queue);
+  auto track = trackProvider->currentTrack();
+  if (track) {
+    playerState.track = *track;
+    playerState.index.hasValue = true;
+    playerState.index.value = trackProvider->currentContextIndex().value();
+  } else {
+    playerState.index.hasValue = false;
+  }
 
-  // auto provideRes = trackProvider->provideTrack(currentTrackid);
-  // if (!provideRes) {
-  //   BELL_LOG(error, LOG_TAG, "Failed to provide current track: {}",
-  //            provideRes.errorMessage());
-  //   return provideRes.getError();
-  // }
+  putState();
 
-  // auto contextRes =
-  //     trackProvider->setTrackContext(transferState.current_session.context,
-  //                                    transferState.current_session.currentUid);
-  // if (!contextRes) {
-  //   BELL_LOG(error, LOG_TAG, "Failed to set track context: {}",
-  //            contextRes.errorMessage());
-  //   return contextRes.getError();
-  // }
+  return {};
+}
 
-  // putState();
+bell::Result<> ConnectStateHandler::handleSkipNextCommand() {
+  auto res = trackProvider->skipToNextTrack();
+  if (!res) {
+    BELL_LOG(error, LOG_TAG, "Failed to skip next track");
+    return res.getError();
+  }
+
+  auto& playerState = putStateRequestProto.device.playerState;
+  auto track = trackProvider->currentTrack();
+  if (track) {
+    playerState.track = *track;
+    playerState.index.hasValue = true;
+    playerState.index.value = trackProvider->currentContextIndex().value();
+  } else {
+    playerState.index.hasValue = false;
+  }
+
+  playerState.positionAsOfTimestamp = 0;
+  playerState.timestamp =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count();
+
+  putState();
 
   return {};
 }

@@ -60,7 +60,7 @@
 
       devShells = {
         default = pkgs.mkShell {
-          packages = with pkgs; [cmake unstable.mbedtls ninja python3] ++ [clang-tools llvm.clang];
+          packages = with pkgs; [cmake unstable.mbedtls ninja python3 python3Packages.protobuf protobuf] ++ [clang-tools llvm.clang];
         };
       };
     in {
