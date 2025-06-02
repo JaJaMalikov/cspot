@@ -60,8 +60,8 @@ NANOPB_STRUCT(cspot_proto::DeviceInfo, DeviceInfo_fields)
 
 namespace cspot_proto {
 struct ContextIndex {
-  int32_t page = 0;
-  int32_t track = 0;
+  uint32_t page = 0;
+  uint32_t track = 0;
 
   static auto bindFields(ContextIndex* self, bool isDecode) {
     _ContextIndex rawProto = ContextIndex_init_zero;
@@ -132,6 +132,27 @@ struct Context {
 NANOPB_STRUCT(cspot_proto::Context, Context_fields)
 
 namespace cspot_proto {
+struct PlayOrigin {
+  std::string featureIdentifier;
+  std::string deviceIdentifier;
+  std::string referrerIdentifier;
+
+  static auto bindFields(PlayOrigin* self, bool isDecode) {
+    _PlayOrigin rawProto = PlayOrigin_init_zero;
+    nanopb_helper::bindField(rawProto.feature_identifier,
+                             self->featureIdentifier, isDecode);
+    nanopb_helper::bindField(rawProto.device_identifier, self->deviceIdentifier,
+                             isDecode);
+    nanopb_helper::bindField(rawProto.referrer_identifier,
+                             self->referrerIdentifier, isDecode);
+    return rawProto;
+  }
+};
+};  // namespace cspot_proto
+
+NANOPB_STRUCT(cspot_proto::PlayOrigin, PlayOrigin_fields)
+
+namespace cspot_proto {
 struct ContextPlayerOptions {
   bool shufflingContext;
   bool repeatingContext;
@@ -181,6 +202,8 @@ struct PlayerState {
   cspot_proto::ProvidedTrack track;
   std::string playbackId;
   nanopb_helper::Optional<ContextIndex> index;
+  ContextPlayerOptions options;
+  PlayOrigin playOrigin;
   double playbackSpeed = 1.0;
   int64_t positionAsOfTimestamp = 0;
   int64_t duration = 0;
@@ -188,8 +211,8 @@ struct PlayerState {
   bool isBuffering;
   bool isPaused;
   bool isSystemInitiated;
-  std::vector<cspot_proto::ProvidedTrack> nextTracks;
-  std::vector<cspot_proto::ProvidedTrack> prevTracks;
+  pb_callback_t nextTracks;
+  pb_callback_t prevTracks;
   std::string sessionId;
   int64_t position = 0;
 
@@ -213,8 +236,11 @@ struct PlayerState {
     nanopb_helper::bindField(rawProto.is_paused, self->isPaused, isDecode);
     nanopb_helper::bindField(rawProto.is_system_initiated,
                              self->isSystemInitiated, isDecode);
-    nanopb_helper::bindField(rawProto.next_tracks, self->nextTracks, isDecode);
-    nanopb_helper::bindField(rawProto.prev_tracks, self->prevTracks, isDecode);
+    nanopb_helper::bindField(rawProto.options, self->options, isDecode);
+    nanopb_helper::bindField(rawProto.play_origin, self->playOrigin, isDecode);
+    // Next and previous tracks are encoded through a custom callback
+    rawProto.next_tracks = self->nextTracks;
+    rawProto.prev_tracks = self->prevTracks;
     nanopb_helper::bindField(rawProto.session_id, self->sessionId, isDecode);
     nanopb_helper::bindVarintField(rawProto.position, self->position, isDecode);
     return rawProto;
@@ -272,6 +298,7 @@ struct Session {
   cspot_proto::Context context;
   std::string currentUid;
   nanopb_helper::Optional<std::string> originalSessionId;
+  cspot_proto::PlayOrigin playOrigin;
 
   static auto bindFields(Session* self, bool isDecode) {
     _Session rawProto = Session_init_zero;
@@ -279,6 +306,7 @@ struct Session {
     nanopb_helper::bindField(rawProto.current_uid, self->currentUid, isDecode);
     nanopb_helper::bindField(rawProto.original_session_id,
                              self->originalSessionId, isDecode);
+    nanopb_helper::bindField(rawProto.play_origin, self->playOrigin, isDecode);
     return rawProto;
   }
 };

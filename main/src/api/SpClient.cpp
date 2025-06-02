@@ -27,17 +27,12 @@ bell::Result<> SpClient::putConnectStateInactive(int retryCount) {
 
 bell::Result<> SpClient::putConnectState(
     cspot_proto::PutStateRequest& stateRequest, int retryCount) {
-  bool encodeRes = nanopb_helper::encodeToVector(stateRequest, requestBuffer);
+  std::vector<uint8_t> freshBuffer;
+  auto encodeRes = nanopb_helper::encodeToVector(stateRequest, freshBuffer);
   if (!encodeRes) {
     BELL_LOG(error, LOG_TAG, "Error while encoding message");
     return std::errc::bad_message;
   }
-
-  std::vector<uint8_t> freshBuffer;
-  encodeRes = nanopb_helper::encodeToVector(stateRequest, freshBuffer);
-
-  logDataBase64(reinterpret_cast<uint8_t*>(freshBuffer.data()),
-                freshBuffer.size());
 
   auto addrRes = sessionContext->credentialsResolver->getApAddress(
       CredentialsResolver::AddressType::SpClient);
@@ -56,10 +51,12 @@ bell::Result<> SpClient::putConnectState(
 
   // size_t encodedLength = encodeRes;
 
+  uint32_t salt = std::rand();
   auto response = bell::http::requestWithBodyPtr(
       bell::HTTPMethod::PUT,
-      fmt::format("https://{}/connect-state/v1/devices/{}", spClientAddress,
-                  sessionContext->loginBlob->getDeviceId()),
+      fmt::format(
+          "https://{}/connect-state/v1/devices/{}?product=0&country=PL&salt={}",
+          spClientAddress, sessionContext->loginBlob->getDeviceId(), salt),
       {
           {
               "Content-Type",
@@ -68,8 +65,8 @@ bell::Result<> SpClient::putConnectState(
           {"X-Spotify-Connection-Id", sessionContext->sessionId},
           {"Authorization", fmt::format("Bearer {}", accessToken)},
       },
-      reinterpret_cast<const std::byte*>(requestBuffer.data()),
-      requestBuffer.size());
+      reinterpret_cast<const std::byte*>(freshBuffer.data()),
+      freshBuffer.size());
 
   if (!response) {
     BELL_LOG(error, LOG_TAG, "Error while sending request: {}",
@@ -81,14 +78,8 @@ bell::Result<> SpClient::putConnectState(
   if (httpResponse.getStatusCode().unwrap() != 200) {
     BELL_LOG(error, LOG_TAG, "Error while sending request: {}",
              httpResponse.getStatusCode().unwrap());
-    std::cout << "Response body: "
-              << httpResponse.getBodyStringView().getValue() << std::endl;
     return std::errc::bad_message;
   }
-
-  logDataBase64(
-      reinterpret_cast<const uint8_t*>(httpResponse.getBodyBytesPtr().unwrap()),
-      httpResponse.getBodyBytesLength().unwrap());
   return {};
 }
 

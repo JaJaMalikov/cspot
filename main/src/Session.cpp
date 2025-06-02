@@ -75,9 +75,6 @@ void cspot::Session::handleDealerRequest(EventLoop::Event&& event) {
   auto dealerRequestEvent = std::move(event);
   auto& messageJson = std::get<tao::json::value>(dealerRequestEvent.payload);
 
-  BELL_LOG(info, LOG_TAG, "Received dealer request: {}",
-           tao::json::to_string(messageJson));
-
   auto messageIdent = messageJson.optional<std::string>("message_ident");
   if (!messageIdent) {
     BELL_LOG(info, LOG_TAG, "Received message without message_ident");

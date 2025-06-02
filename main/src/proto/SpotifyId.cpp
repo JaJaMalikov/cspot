@@ -52,6 +52,9 @@ cspot::SpotifyId::SpotifyId(SpotifyIdType type, const std::vector<uint8_t>& gid)
 
   // Convert GID to Base62
   this->base62Gid = base62Encode(gid.data(), gid.size());
+  // Pad Base62 GID to 22 characters
+  this->base62Gid =
+      std::string(22 - this->base62Gid.size(), '0') + this->base62Gid;
 
   // Construct URI based on type
   this->uri = typeToPrefix(type) + this->base62Gid;

@@ -36,5 +36,7 @@ class ConnectStateHandler {
 
   bell::Result<> handleTransferCommand(std::string_view payloadDataStr,
                                        const tao::json::value& options);
+
+  bell::Result<> handleSkipNextCommand();
 };
 }  // namespace cspot
