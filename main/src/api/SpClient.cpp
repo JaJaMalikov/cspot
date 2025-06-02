@@ -92,7 +92,7 @@ bell::Result<> SpClient::putConnectState(
   return {};
 }
 
-bell::Result<tao::json::value> SpClient::contextResolve(
+bell::Result<bell::HTTPReader> SpClient::contextResolve(
     const std::string& contextUri) {
   auto addrRes = sessionContext->credentialsResolver->getApAddress(
       CredentialsResolver::AddressType::SpClient);
@@ -114,8 +114,6 @@ bell::Result<tao::json::value> SpClient::contextResolve(
     return clientTokenRes.getError();
   }
   auto clientToken = clientTokenRes.takeValue();
-  std::cout << "Client token:" << clientToken << std::endl;
-  std::cout << "Access token:" << accessToken << std::endl;
   auto response = bell::http::request(
       bell::HTTPMethod::GET,
       fmt::format("https://{}/context-resolve/v1/{}", spClientAddress,
@@ -131,25 +129,7 @@ bell::Result<tao::json::value> SpClient::contextResolve(
     return response.getError();
   }
 
-  auto httpResponse = response.takeValue();
-
-  if (httpResponse.getStatusCode().unwrap() != 200) {
-    BELL_LOG(error, LOG_TAG, "Error while sending request: {}",
-             httpResponse.getStatusCode().unwrap());
-    return std::errc::bad_message;
-  }
-
-  tao::json::value jsonResponse;
-
-  try {
-    jsonResponse =
-        tao::json::from_string(httpResponse.getBodyStringView().getValue());
-  } catch (const std::exception& e) {
-    BELL_LOG(error, LOG_TAG, "Error parsing JSON response: {}", e.what());
-    return std::errc::bad_message;
-  }
-
-  return jsonResponse;
+  return response;
 }
 
 bell::Result<bell::HTTPReader> SpClient::doRequest(

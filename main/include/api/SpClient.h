@@ -24,7 +24,7 @@ class SpClient {
   bell::Result<> putConnectStateInactive(int retryCount = 3);
   bell::Result<> putConnectState(cspot_proto::PutStateRequest& stateRequest,
                                  int retryCount = 3);
-  bell::Result<tao::json::value> contextResolve(const std::string& contextUri);
+  bell::Result<bell::HTTPReader> contextResolve(const std::string& contextUri);
 
   bell::Result<bell::HTTPReader> doRequest(bell::HTTPMethod method,
                                            const std::string& requestUrl);

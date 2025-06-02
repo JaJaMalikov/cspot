@@ -1,6 +1,7 @@
 #include "ConnectStateHandler.h"
 
 #include <tao/json.hpp>
+#include "ContextTrackResolver.h"
 #include "SessionContext.h"
 #include "api/SpClient.h"
 #include "bell/Logger.h"
@@ -44,37 +45,37 @@ ConnectStateHandler::ConnectStateHandler(
   trackProvider =
       std::make_shared<TrackProvider>(this->sessionContext, this->spClient);
 
-  this->sessionContext->eventLoop->registerHandler(
-      EventLoop::EventType::CURRENT_TRACK_METADATA,
-      [this](cspot::EventLoop::Event&& event) {
-        auto& currentTrackMetadata =
-            std::get<cspot::CurrentTrackMetadata>(event.payload);
+  // this->sessionContext->eventLoop->registerHandler(
+  //     EventLoop::EventType::CURRENT_TRACK_METADATA,
+  //     [this](cspot::EventLoop::Event&& event) {
+  //       auto& currentTrackMetadata =
+  //           std::get<cspot::CurrentTrackMetadata>(event.payload);
 
-        auto& playerState = putStateRequestProto.device.playerState;
-        playerState.duration = currentTrackMetadata.durationMs;
-      });
+  //       auto& playerState = putStateRequestProto.device.playerState;
+  //       playerState.duration = currentTrackMetadata.durationMs;
+  //     });
 
-  this->sessionContext->eventLoop->registerHandler(
-      EventLoop::EventType::TRACKPROVIDER_UPDATED,
-      [this](cspot::EventLoop::Event&& event) {
-        auto& playerState = putStateRequestProto.device.playerState;
-        // playerState.track = trackProvider->getCurrentTrack();
-        playerState.nextTracks = trackProvider->getNextTracks();
-        playerState.prevTracks = trackProvider->getPreviousTracks();
+  // this->sessionContext->eventLoop->registerHandler(
+  //     EventLoop::EventType::TRACKPROVIDER_UPDATED,
+  //     [this](cspot::EventLoop::Event&& event) {
+  //       auto& playerState = putStateRequestProto.device.playerState;
+  //       // playerState.track = trackProvider->getCurrentTrack();
+  //       playerState.nextTracks = trackProvider->getNextTracks();
+  //       playerState.prevTracks = trackProvider->getPreviousTracks();
 
-        auto currentContextIndex = trackProvider->getCurrentContextIndex();
-        if (currentContextIndex.has_value()) {
-          playerState.index.value = currentContextIndex.value();
-          playerState.index.hasValue = true;
-        } else {
-          playerState.index.hasValue = false;
-        }
+  //       auto currentContextIndex = trackProvider->getCurrentContextIndex();
+  //       if (currentContextIndex.has_value()) {
+  //         playerState.index.value = currentContextIndex.value();
+  //         playerState.index.hasValue = true;
+  //       } else {
+  //         playerState.index.hasValue = false;
+  //       }
 
-        BELL_LOG(info, LOG_TAG, "Updated player state with current track: {}",
-                 playerState.track.uri);
-        // Update state
-        this->putState();
-      });
+  //       BELL_LOG(info, LOG_TAG, "Updated player state with current track: {}",
+  //                playerState.track.uri);
+  //       // Update state
+  //       this->putState();
+  //     });
 
   initialize();
 }
@@ -235,23 +236,34 @@ bell::Result<> ConnectStateHandler::handleTransferCommand(
   playerState.track.uri = currentTrackid.uri;
   playerState.track.provider = "context";
 
-  trackProvider->setQueue(transferState.queue);
+  auto resolver = std::make_unique<ContextTrackResolver>(
+      this->spClient, transferState.current_session.context.url,
+      transferState.current_session.currentUid);
 
-  auto provideRes = trackProvider->provideTrack(currentTrackid);
-  if (!provideRes) {
-    BELL_LOG(error, LOG_TAG, "Failed to provide current track: {}",
-             provideRes.errorMessage());
-    return provideRes.getError();
+  auto resolveRes = resolver->getCurrentTrack();
+  if (!resolveRes) {
+    BELL_LOG(error, LOG_TAG, "Failed to resolve current track: {}",
+             resolveRes.errorMessage());
+    return resolveRes.getError();
   }
 
-  auto contextRes =
-      trackProvider->setTrackContext(transferState.current_session.context,
-                                     transferState.current_session.currentUid);
-  if (!contextRes) {
-    BELL_LOG(error, LOG_TAG, "Failed to set track context: {}",
-             contextRes.errorMessage());
-    return contextRes.getError();
-  }
+  // trackProvider->setQueue(transferState.queue);
+
+  // auto provideRes = trackProvider->provideTrack(currentTrackid);
+  // if (!provideRes) {
+  //   BELL_LOG(error, LOG_TAG, "Failed to provide current track: {}",
+  //            provideRes.errorMessage());
+  //   return provideRes.getError();
+  // }
+
+  // auto contextRes =
+  //     trackProvider->setTrackContext(transferState.current_session.context,
+  //                                    transferState.current_session.currentUid);
+  // if (!contextRes) {
+  //   BELL_LOG(error, LOG_TAG, "Failed to set track context: {}",
+  //            contextRes.errorMessage());
+  //   return contextRes.getError();
+  // }
 
   // putState();
 

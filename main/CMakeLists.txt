@@ -38,9 +38,14 @@ add_subdirectory(../external/websocketpp ${CMAKE_CURRENT_BINARY_DIR}/websocketpp
 # Header only lib, create an interface for it
 add_library(websockets INTERFACE)
 target_include_directories(websockets INTERFACE ${websocketpp_SOURCE_DIR})
-target_compile_options(websockets INTERFACE -Wno-template-id-cdtor)
+target_compile_options(websockets INTERFACE)
 
 list(APPEND EXTRA_LIBS websockets)
+
+# Include picoJSON
+add_subdirectory(../external/picojson ${CMAKE_CURRENT_BINARY_DIR}/picojson)
+
+list(APPEND EXTRA_LIBS picojson)
 
 # Add nanopb module
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../external/nanopb/extra)

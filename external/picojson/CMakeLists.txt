@@ -3,4 +3,4 @@ project(picojson)
 
 # Add the library target
 add_library(picojson INTERFACE)
-target_include_directories(picojson PUBLIC "picojson.h")
+target_include_directories(picojson INTERFACE ".")
