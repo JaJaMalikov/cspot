@@ -10,8 +10,7 @@ namespace cspot {
 class ContextTrackResolver {
  public:
   ContextTrackResolver(std::shared_ptr<SpClient> spClient,
-                       uint32_t maxPreviousTracksCount = 16,
-                       uint32_t maxNextTracksCount = 16,
+                       uint32_t maxWindowSize = 32,
                        uint32_t trackUpdateThreshold = 8);
 
   /**
@@ -82,6 +81,10 @@ class ContextTrackResolver {
     std::optional<TrackId> firstId = std::nullopt;
     std::optional<std::string> nextPageUrl = std::nullopt;
 
+    std::vector<uint32_t> trackIndexes = {};
+    uint32_t fetchWindowStart = 0;
+    uint32_t fetchWindowEnd = 0;
+
     bool isInRoot = false;
 
     // Implement comparison operator
@@ -91,14 +94,10 @@ class ContextTrackResolver {
     }
   };
 
-  // Enum to define the context fetch window type
-  enum class ContextFetchWindow { BeforeID, AfterID, AroundID };
+  enum class FetchMode { Replace, AddPrevious, AddNext, Ignore };
 
   // Struct to hold the state of the context track parsing
   struct ContextTrackParseState {
-    // Fetch window configuration
-    ContextFetchWindow fetchWindow;
-
     // Target track ID
     TrackId targetTrackId;
 
@@ -107,8 +106,9 @@ class ContextTrackResolver {
     std::optional<uint32_t> foundTrackIndex = std::nullopt;
 
     // Window size config
-    uint32_t maxPreviousTracksCount = 0;
-    uint32_t maxNextTracksCount = 0;
+    uint32_t maxWindowSize = 0;
+
+    FetchMode fetchMode = FetchMode::Replace;
   };
 
  private:
@@ -122,8 +122,7 @@ class ContextTrackResolver {
   // Config
   TrackId currentTrackId;
 
-  uint32_t maxPreviousTracksCount;
-  uint32_t maxNextTracksCount;
+  uint32_t maxWindowSize;
   uint32_t trackUpdateThreshold;
 
   // Contains state for the context track parser
@@ -133,7 +132,7 @@ class ContextTrackResolver {
   std::vector<cspot_proto::ContextTrack> trackCache;
   std::optional<uint32_t> currentTrackInCacheIndex;
 
-  void resetContextParseState();
+bool prepareParseState();
 
   void updateTracksFromParseState();
 

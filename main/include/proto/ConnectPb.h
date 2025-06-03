@@ -69,6 +69,15 @@ struct ContextIndex {
     nanopb_helper::bindVarintField(rawProto.track, self->track, isDecode);
     return rawProto;
   }
+
+  // Implement compare
+  bool operator>(const ContextIndex& other) const {
+    if (page > other.page)
+      return true;
+    if (page < other.page)
+      return false;
+    return track > other.track;
+  }
 };
 }  // namespace cspot_proto
 NANOPB_STRUCT(cspot_proto::ContextIndex, ContextIndex_fields)
