@@ -143,7 +143,7 @@ bell::Result<> ApConnection::solveHelloChallenge(const uint8_t* helloPacket,
             shanSendKey.begin());
 
   // Shan recv key = [0x34:0x54]
-  std::copy(challengeResult.begin() + 0x14, challengeResult.begin() + 0x34,
+  std::copy(challengeResult.begin() + 0x34, challengeResult.begin() + 0x54,
             shanRecvKey.begin());
 
   // Reuse the challengeData buffer for the response
