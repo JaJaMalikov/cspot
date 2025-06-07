@@ -1,6 +1,6 @@
 #include "ConnectStateHandler.h"
 
-#include <tao/json.hpp>
+#include <cJSON.h>
 #include "ContextTrackResolver.h"
 #include "SessionContext.h"
 #include "api/SpClient.h"
@@ -132,22 +132,29 @@ void ConnectStateHandler::initialize() {
   playerState.prevTracks.arg = trackProvider.get();
 }
 
-bell::Result<> ConnectStateHandler::handlePlayerCommand(
-    tao::json::value& messageJson) {
-  auto& payload = messageJson.at("payload");
-  auto& command = payload.at("command");
-  std::string endpoint = command.at("endpoint").get_string();
+bell::Result<> ConnectStateHandler::handlePlayerCommand(cJSON* messageJson) {
+  cJSON* payload = cJSON_GetObjectItem(messageJson, "payload");
+  cJSON* command = cJSON_GetObjectItem(payload, "command");
+  cJSON* endpointItem = cJSON_GetObjectItem(command, "endpoint");
+  if (!cJSON_IsString(endpointItem)) {
+    return std::errc::bad_message;
+  }
+  std::string endpoint = endpointItem->valuestring;
 
   // Assign the last message ID and device ID
-  putStateRequestProto.lastCommandMessageId =
-      payload.at("message_id").get_unsigned();
-  putStateRequestProto.lastCommandSentByDeviceId =
-      payload.at("sent_by_device_id").get_string();
+  cJSON* msgId = cJSON_GetObjectItem(payload, "message_id");
+  cJSON* sentBy = cJSON_GetObjectItem(payload, "sent_by_device_id");
+  if (cJSON_IsNumber(msgId))
+    putStateRequestProto.lastCommandMessageId = msgId->valueint;
+  if (cJSON_IsString(sentBy))
+    putStateRequestProto.lastCommandSentByDeviceId = sentBy->valuestring;
 
   if (endpoint == "transfer") {
     BELL_LOG(info, LOG_TAG, "Received transfer command");
-    std::string_view payloadDataStr = command.as<std::string_view>("data");
-    return handleTransferCommand(payloadDataStr, command["options"]);
+    cJSON* dataItem = cJSON_GetObjectItem(command, "data");
+    cJSON* optionsItem = cJSON_GetObjectItem(command, "options");
+    std::string payloadDataStr = cJSON_IsString(dataItem) ? dataItem->valuestring : "";
+    return handleTransferCommand(payloadDataStr, optionsItem);
   } else if (endpoint == "skip_next") {
     BELL_LOG(info, LOG_TAG, "Received skip_next command");
     return handleSkipNextCommand();
@@ -173,7 +180,7 @@ bell::Result<> ConnectStateHandler::putState(PutStateReason reason) {
 }
 
 bell::Result<> ConnectStateHandler::handleTransferCommand(
-    std::string_view payloadDataStr, const tao::json::value& options) {
+    std::string_view payloadDataStr, cJSON* options) {
   size_t olen = 0;
 
   // Get the size of the base64 decoded data
@@ -225,9 +232,13 @@ bell::Result<> ConnectStateHandler::handleTransferCommand(
   playerState.isBuffering = false;
   playerState.timestamp = transferState.playback.timestamp;
 
-  bool shouldPause =
-      transferState.playback.isPaused &&
-      options.optional<std::string>("restore_paused") == "restore";
+  bool shouldPause = transferState.playback.isPaused;
+  if (options) {
+    cJSON* restore = cJSON_GetObjectItem(options, "restore_paused");
+    if (cJSON_IsString(restore) && std::string(restore->valuestring) == "restore") {
+      shouldPause = true;
+    }
+  }
 
   playerState.isPaused = shouldPause;
   playerState.contextUri = transferState.current_session.context.uri;

@@ -17,8 +17,6 @@ class Session {
 
   bell::Result<> start();
 
-  void runPoller() { sessionContext->socketPoll.poll(); }
-
  private:
   const char* LOG_TAG = "Session";
 

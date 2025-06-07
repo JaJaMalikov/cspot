@@ -3,7 +3,7 @@
 #include <fmt/format.h>
 #include <iostream>
 #include <memory>
-#include <tao/json.hpp>
+#include <cJSON.h>
 #include "NanoPBExtensions.h"
 #include "Utils.h"
 #include "bell/Logger.h"
@@ -53,7 +53,7 @@ bell::Result<> SpClient::putConnectState(
 
   uint32_t salt = std::rand();
   auto response = bell::http::requestWithBodyPtr(
-      bell::HTTPMethod::PUT,
+      bell::http::Method::PUT,
       fmt::format(
           "https://{}/connect-state/v1/devices/{}?product=0&country=PL&salt={}",
           spClientAddress, sessionContext->loginBlob->getDeviceId(), salt),
@@ -106,7 +106,7 @@ bell::Result<bell::HTTPReader> SpClient::contextResolve(
   }
   auto clientToken = clientTokenRes.takeValue();
   auto response = bell::http::request(
-      bell::HTTPMethod::GET,
+      bell::http::Method::GET,
       fmt::format("https://{}/context-resolve/v1/{}", spClientAddress,
                   contextUri),
       {
@@ -124,7 +124,7 @@ bell::Result<bell::HTTPReader> SpClient::contextResolve(
 }
 
 bell::Result<bell::HTTPReader> SpClient::doRequest(
-    bell::HTTPMethod method, const std::string& requestUrl) {
+    bell::http::Method method, const std::string& requestUrl) {
   std::cout << requestUrl << std::endl;
 
   auto addrRes = sessionContext->credentialsResolver->getApAddress(

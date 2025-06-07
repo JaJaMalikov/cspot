@@ -1,8 +1,7 @@
 #include "Session.h"
 
 #include <string>
-#include <tao/json.hpp>
-#include <tao/json/traits.hpp>
+#include <cJSON.h>
 #include "bell/Logger.h"
 #include "connect.pb.h"
 #include "events/EventLoop.h"
@@ -37,27 +36,34 @@ cspot::Session::Session(std::shared_ptr<LoginBlob> loginBlob)
 
 void cspot::Session::handleDealerMessage(EventLoop::Event&& event) {
   auto dealerMessageEvent = std::move(event);
-  auto& messageJson = std::get<tao::json::value>(dealerMessageEvent.payload);
-
-  auto uri = messageJson.optional<std::string>("uri");
-
-  if (!uri) {
-    BELL_LOG(info, LOG_TAG, "Received message without URI");
+  std::string messageStr = std::get<std::string>(dealerMessageEvent.payload);
+  cJSON* messageJson = cJSON_Parse(messageStr.c_str());
+  if (!messageJson) {
+    BELL_LOG(error, LOG_TAG, "Invalid JSON message");
     return;
   }
 
-  if (uri->starts_with("hm://pusher/v1/connections")) {
-    // Extract session ID
-    auto headers = messageJson.at("headers");
+  cJSON* uriItem = cJSON_GetObjectItem(messageJson, "uri");
+  if (!cJSON_IsString(uriItem)) {
+    BELL_LOG(info, LOG_TAG, "Received message without URI");
+    cJSON_Delete(messageJson);
+    return;
+  }
+  std::string uri = uriItem->valuestring;
 
-    auto sessionId = headers.optional<std::string>("Spotify-Connection-Id");
-    if (!sessionId) {
+  if (uri.rfind("hm://pusher/v1/connections", 0) == 0) {
+    // Extract session ID
+    cJSON* headers = cJSON_GetObjectItem(messageJson, "headers");
+    cJSON* sessionIdItem =
+        cJSON_GetObjectItem(headers, "Spotify-Connection-Id");
+    if (!cJSON_IsString(sessionIdItem)) {
       BELL_LOG(info, LOG_TAG, "Received message without session ID");
+      cJSON_Delete(messageJson);
       return;
     }
 
-    sessionContext->sessionId = *sessionId;
-    BELL_LOG(info, LOG_TAG, "Session ID: {}", *sessionId);
+    sessionContext->sessionId = sessionIdItem->valuestring;
+    BELL_LOG(info, LOG_TAG, "Session ID: %s", sessionIdItem->valuestring);
 
     // Announce spotify connect state
     auto res = connectStateHandler->putState(PutStateReason_NEW_CONNECTION);
@@ -67,25 +73,35 @@ void cspot::Session::handleDealerMessage(EventLoop::Event&& event) {
       return;
     }
   } else {
-    BELL_LOG(info, LOG_TAG, "Received message with URI: {}", *uri);
+    BELL_LOG(info, LOG_TAG, "Received message with URI: %s", uri.c_str());
   }
+  cJSON_Delete(messageJson);
 }
 
 void cspot::Session::handleDealerRequest(EventLoop::Event&& event) {
   auto dealerRequestEvent = std::move(event);
-  auto& messageJson = std::get<tao::json::value>(dealerRequestEvent.payload);
+  std::string messageStr = std::get<std::string>(dealerRequestEvent.payload);
+  cJSON* messageJson = cJSON_Parse(messageStr.c_str());
+  if (!messageJson) {
+    BELL_LOG(error, LOG_TAG, "Invalid JSON request");
+    return;
+  }
 
-  auto messageIdent = messageJson.optional<std::string>("message_ident");
-  if (!messageIdent) {
+  cJSON* identItem = cJSON_GetObjectItem(messageJson, "message_ident");
+  if (!cJSON_IsString(identItem)) {
     BELL_LOG(info, LOG_TAG, "Received message without message_ident");
+    cJSON_Delete(messageJson);
     return;
   }
+  std::string messageIdent = identItem->valuestring;
 
-  auto requestKey = messageJson.optional<std::string>("key");
-  if (!requestKey) {
+  cJSON* keyItem = cJSON_GetObjectItem(messageJson, "key");
+  if (!cJSON_IsString(keyItem)) {
     BELL_LOG(info, LOG_TAG, "Received message without request key");
+    cJSON_Delete(messageJson);
     return;
   }
+  std::string requestKey = keyItem->valuestring;
 
   bool requestSuccess = false;
 
@@ -100,11 +116,12 @@ void cspot::Session::handleDealerRequest(EventLoop::Event&& event) {
     }
   }
 
-  auto replyRes = dealerClient->replyToRequest(requestSuccess, *requestKey);
+  auto replyRes = dealerClient->replyToRequest(requestSuccess, requestKey);
   if (!replyRes) {
     BELL_LOG(error, LOG_TAG, "Failed to reply to dealer request: {}",
              replyRes.errorMessage());
   }
+  cJSON_Delete(messageJson);
 }
 
 bell::Result<> cspot::Session::start() {

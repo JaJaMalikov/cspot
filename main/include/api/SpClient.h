@@ -26,7 +26,7 @@ class SpClient {
                                  int retryCount = 3);
   bell::Result<bell::HTTPReader> contextResolve(const std::string& contextUri);
 
-  bell::Result<bell::HTTPReader> doRequest(bell::HTTPMethod method,
+  bell::Result<bell::HTTPReader> doRequest(bell::http::Method method,
                                            const std::string& requestUrl);
 
   bell::Result<cspot_proto::Track> trackMetadata(const SpotifyId& trackId);
