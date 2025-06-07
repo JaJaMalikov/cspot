@@ -23,6 +23,7 @@ Summary:
 
 - cmake (version 3.0 or higher)
 - [esp-idf](https://github.com/espressif/esp-idf) for building for the esp32
+
 - golang (1.16)
 - protoc
 - on Linux you will additionally need:
