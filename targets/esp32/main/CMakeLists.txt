@@ -7,7 +7,7 @@ file(GLOB SOURCES "*.cpp" "*.c")
 idf_component_register(
     SRCS ${SOURCES}
     INCLUDE_DIRS "."
-    REQUIRES led_strip
+    REQUIRES led_strip driver
 )
 idf_build_set_property(COMPILE_OPTIONS "-fdiagnostics-color=always" APPEND)
 
@@ -16,7 +16,7 @@ option(BUILD_SHARED_LIBS OFF)
 option(BUILD_TESTING OFF)
 
 # Import cspot library
-add_subdirectory("../../../cspot" ${CMAKE_CURRENT_BINARY_DIR}/cspot)
+add_subdirectory("../../../main" ${CMAKE_CURRENT_BINARY_DIR}/cspot)
 
 # Configure the target
 target_link_libraries(${COMPONENT_LIB} PUBLIC cspot)
