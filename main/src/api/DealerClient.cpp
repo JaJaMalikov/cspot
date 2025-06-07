@@ -1,7 +1,7 @@
 #include "api/DealerClient.h"
 #include "SessionContext.h"
 #include <cJSON.h>
-#include <fmt/format.h>
+#include <format>
 
 using namespace cspot;
 
@@ -15,7 +15,7 @@ bell::Result<> DealerClient::connect() {
       sessionContext->credentialsResolver->getApAddress(CredentialsResolver::AddressType::Dealer);
   if (!dealerAddr) return dealerAddr.getError();
 
-  std::string url = fmt::format("wss://{}/?access_token={}", dealerAddr.getValue(),
+  std::string url = std::format("wss://{}/?access_token={}", dealerAddr.getValue(),
                                accessKey.getValue());
   esp_websocket_client_config_t cfg = {};
   cfg.uri = url.c_str();

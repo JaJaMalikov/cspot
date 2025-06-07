@@ -1,6 +1,6 @@
 #include "TrackProvider.h"
 
-#include <fmt/format.h>
+#include <format>
 
 #include "proto/ConnectPb.h"
 #include "proto/NanoPBHelper.h"
@@ -34,7 +34,7 @@ std::optional<cspot_proto::ProvidedTrack> TrackProvider::currentTrack() {
 
   if (isPlayingQueue) {
     track.uri = trackQueue[trackQueueIndex].uri;
-    track.uid = fmt::format("q{}", trackQueueIndex);
+    track.uid = std::format("q{}", trackQueueIndex);
     track.provider = "queue";
     return track;
   }

@@ -1,6 +1,6 @@
 #include "api/SpClient.h"
 
-#include <fmt/format.h>
+#include <format>
 #include <iostream>
 #include <memory>
 #include <cJSON.h>
@@ -8,7 +8,6 @@
 #include "Utils.h"
 #include "bell/Logger.h"
 #include "bell/http/Client.h"
-#include "bell/http/Common.h"
 
 #include "connect.pb.h"
 #include "mbedtls/base64.h"
@@ -54,7 +53,7 @@ bell::Result<> SpClient::putConnectState(
   uint32_t salt = std::rand();
   auto response = bell::http::requestWithBodyPtr(
       bell::http::Method::PUT,
-      fmt::format(
+      std::format(
           "https://{}/connect-state/v1/devices/{}?product=0&country=PL&salt={}",
           spClientAddress, sessionContext->loginBlob->getDeviceId(), salt),
       {
@@ -63,7 +62,7 @@ bell::Result<> SpClient::putConnectState(
               "application/x-protobuf",
           },
           {"X-Spotify-Connection-Id", sessionContext->sessionId},
-          {"Authorization", fmt::format("Bearer {}", accessToken)},
+          {"Authorization", std::format("Bearer {}", accessToken)},
       },
       reinterpret_cast<const std::byte*>(freshBuffer.data()),
       freshBuffer.size());
@@ -107,11 +106,11 @@ bell::Result<bell::HTTPReader> SpClient::contextResolve(
   auto clientToken = clientTokenRes.takeValue();
   auto response = bell::http::request(
       bell::http::Method::GET,
-      fmt::format("https://{}/context-resolve/v1/{}", spClientAddress,
+      std::format("https://{}/context-resolve/v1/{}", spClientAddress,
                   contextUri),
       {
           {"Client-Token", clientToken},
-          {"Authorization", fmt::format("Bearer {}", accessToken)},
+          {"Authorization", std::format("Bearer {}", accessToken)},
       });
 
   if (!response) {
@@ -149,10 +148,10 @@ bell::Result<bell::HTTPReader> SpClient::doRequest(
   auto clientToken = clientTokenRes.takeValue();
 
   auto response = bell::http::request(
-      method, fmt::format("https://{}/{}", spClientAddress, requestUrl),
+      method, std::format("https://{}/{}", spClientAddress, requestUrl),
       {
           {"Client-Token", clientToken},
-          {"Authorization", fmt::format("Bearer {}", accessToken)},
+          {"Authorization", std::format("Bearer {}", accessToken)},
       });
 
   if (!response) {
@@ -168,7 +167,7 @@ bell::Result<bell::HTTPReader> SpClient::doRequest(
 //     const std::string& scope, const std::string& contextUri, bool autoplay,
 //     int pageSize) {
 //   return hmRequest(
-//       fmt::format("hm://radio-apollo/v3/{}/{}/?autoplay={}&count={}", scope,
+//       std::format("hm://radio-apollo/v3/{}/{}/?autoplay={}&count={}", scope,
 //                   contextUri, autoplay, pageSize));
 // }
 
@@ -181,7 +180,7 @@ bell::Result<cspot_proto::Track> SpClient::trackMetadata(
   }
 
   auto res = doRequest(bell::http::Method::GET,
-                       fmt::format("metadata/4/track/{}", trackId.hexGid()));
+                       std::format("metadata/4/track/{}", trackId.hexGid()));
   if (!res) {
     return res.getError();
   }

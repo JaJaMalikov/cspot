@@ -5,7 +5,6 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-#include "fmt/format.h"
 
 using namespace cspot;
 

@@ -4,7 +4,7 @@
 #include <string>
 #include "api/SpClient.h"
 #include "proto/ConnectPb.h"
-#include "tcb/span.hpp"
+#include <span>
 
 namespace cspot {
 class ContextTrackResolver {
@@ -22,8 +22,8 @@ class ContextTrackResolver {
 
   bell::Result<cspot_proto::ContextTrack> getCurrentTrack();
 
-  tcb::span<cspot_proto::ContextTrack> previousTracks();
-  tcb::span<cspot_proto::ContextTrack> nextTracks();
+  std::span<cspot_proto::ContextTrack> previousTracks();
+  std::span<cspot_proto::ContextTrack> nextTracks();
 
   bell::Result<cspot_proto::ContextTrack> skipForward(
       const cspot_proto::ContextTrack& track);

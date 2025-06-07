@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
-#include "fmt/core.h"
+#include <format>
 #include "mbedtls/base64.h"
 
 namespace cspot {
@@ -14,7 +14,7 @@ inline void logDataBase64(const uint8_t* data, size_t dataSize) {
   int res = mbedtls_base64_encode(nullptr, 0, &outputSize, data, dataSize);
   if (outputSize == 0) {
     throw std::runtime_error(
-        fmt::format("Failed to calculate base64 encoded public key size"));
+        std::format("Failed to calculate base64 encoded public key size"));
   }
 
   outputStr.resize(outputSize);

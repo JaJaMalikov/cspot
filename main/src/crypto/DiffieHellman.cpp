@@ -1,7 +1,7 @@
 #include "crypto/DiffieHellman.h"
 
 #include <string>
-#include "fmt/color.h"
+#include <format>
 
 #include <mbedtls/base64.h>
 #include <mbedtls/ctr_drbg.h>
@@ -102,7 +102,7 @@ std::string DH::getPublicKeyBase64() {
                                   publicKey.size());
   if (outputSize == 0) {
     throw std::runtime_error(
-        fmt::format("Failed to calculate base64 encoded public key size"));
+        std::format("Failed to calculate base64 encoded public key size"));
   }
 
   publicKeyBase64.resize(outputSize);

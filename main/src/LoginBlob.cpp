@@ -8,8 +8,8 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/base64.h>
 #include <mbedtls/pkcs5.h>
+#include <format>
 #include <cJSON.h>
-#include "bell/net/URIParser.h"
 
 using namespace cspot;
 
@@ -23,7 +23,7 @@ const std::string deviceType = "SPEAKER";
 }  // namespace
 
 LoginBlob::LoginBlob(const std::string& deviceName) : deviceName(deviceName) {
-  deviceId = fmt::format("{}{:016x}", deviceIdPrefix,
+  deviceId = std::format("{}{:016x}", deviceIdPrefix,
                          std::hash<std::string>{}(deviceName));
 
   // Cache it, so we don't have to recalculate it
