@@ -26,7 +26,7 @@ if(NOT CSPOT_DISABLE_TESTS)
     add_subdirectory("../test" ${CMAKE_CURRENT_BINARY_DIR}/test)
 endif()
 
-list(APPEND EXTRA_LIBS esp_websocket_client esp_http_client protobuf-c cjson)
+list(APPEND EXTRA_LIBS esp_websocket_client esp_http_client protobuf-c cjson mbedtls)
 
 
 # Use protobuf-c and cJSON from ESP-IDF

@@ -1,4 +1,4 @@
-#include <MDNSService.h>
+#include "MDNSService.h"
 #include <arpa/inet.h>
 #include <mbedtls/aes.h>
 #include <stdio.h>
@@ -26,7 +26,6 @@
 #include <SpircHandler.h>
 
 #include <inttypes.h>
-#include "BellTask.h"
 #include "CircularBuffer.h"
 
 #include "BellUtils.h"
