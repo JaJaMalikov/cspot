@@ -43,8 +43,16 @@ ESPStatusLed::ESPStatusLed() {
 
 #ifdef CONFIG_CSPOT_STATUS_LED_TYPE_RMT
     ESP_LOGI(TAG, "Enabling status LED in RGB mode");
-    pStrip_a = led_strip_init(CONFIG_CSPOT_STATUS_LED_RMT_CHANNEL, CSPOT_STATUS_LED_GPIO, 1);
-    pStrip_a->clear(pStrip_a, 50);
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = CSPOT_STATUS_LED_GPIO,
+        .max_leds = 1,
+    };
+    led_strip_rmt_config_t rmt_config = {
+        .resolution_hz = 10 * 1000 * 1000,
+        .flags.with_dma = false,
+    };
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &strip));
+    led_strip_clear(strip);
 #endif
 
 #if defined(CONFIG_CSPOT_STATUS_LED_TYPE_GPIO) || defined(CONFIG_CSPOT_STATUS_LED_TYPE_RMT)
@@ -58,8 +66,9 @@ ESPStatusLed::ESPStatusLed() {
             #endif
             #ifdef CONFIG_CSPOT_STATUS_LED_TYPE_RMT
             uint32_t color = StatusLedBlinkTimings[(int)self->status][2];
-            self->pStrip_a->set_pixel(self->pStrip_a, 0, (color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
-            self->pStrip_a->refresh(self->pStrip_a, 100);
+            led_strip_set_pixel(self->strip, 0, (color >> 16) & 0xff,
+                                (color >> 8) & 0xff, color & 0xff);
+            led_strip_refresh(self->strip);
             #endif
             vTaskDelay(StatusLedBlinkTimings[(int)self->status][0] / portTICK_PERIOD_MS);
 
@@ -68,7 +77,7 @@ ESPStatusLed::ESPStatusLed() {
             gpio_set_level(CSPOT_STATUS_LED_GPIO, 0);
             #endif
             #ifdef CONFIG_CSPOT_STATUS_LED_TYPE_RMT
-            self->pStrip_a->clear(self->pStrip_a, 50);
+            led_strip_clear(self->strip);
             #endif
             vTaskDelay(StatusLedBlinkTimings[(int)self->status][1] / portTICK_PERIOD_MS);
         }

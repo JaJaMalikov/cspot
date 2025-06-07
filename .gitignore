@@ -9,4 +9,5 @@ authBlob.json
 config.json
 cspot/protos
 targets/esp32/sdkconfig.cspot-wrover-b
+esp-idf/
 *.bak

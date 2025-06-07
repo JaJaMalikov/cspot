@@ -7,6 +7,7 @@ file(GLOB SOURCES "*.cpp" "*.c")
 idf_component_register(
     SRCS ${SOURCES}
     INCLUDE_DIRS "."
+    REQUIRES led_strip
 )
 idf_build_set_property(COMPILE_OPTIONS "-fdiagnostics-color=always" APPEND)
 
