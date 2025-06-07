@@ -23,26 +23,14 @@ Summary:
 
 - cmake (version 3.0 or higher)
 - [esp-idf](https://github.com/espressif/esp-idf) for building for the esp32
-- downloaded submodules
+
 - golang (1.16)
 - protoc
 - on Linux you will additionally need:
     - `libasound` and `libavahi-compat-libdnssd`
 - mbedtls
 
-This project utilizes submodules, please make sure you are cloning with the `--recursive` flag or use `git submodule update --init --recursive`.
-
-MBedTLS is now the sole option, so you can get it from [there](https://github.com/Mbed-TLS/mbedtls) and rebuild it or have it installed system-wide using your favorite package manager. See below how to use a local version.
-
-This library uses nanopb to generate c files from protobuf definitions. Nanopb itself is included via submodules, but it requires a few external python libraries to run the generators.
-
-To install them you can use pip:
-
-```shell
-$ sudo pip3 install protobuf grpcio-tools
-```
-
-(You probably should use venv, but I am no python developer)
+MBedTLS is now the sole option, so you can get it from [there](https://github.com/Mbed-TLS/mbedtls) and rebuild it or have it installed system-wide using your favorite package manager.
 
 To install avahi and asound dependencies on Linux you can use:
 
@@ -58,10 +46,7 @@ The ESP32 target is built using the [esp-idf](https://docs.espressif.com/project
 
 ```shell
 # Follow the instructions for setting up esp-idf for your operating system, up to `. ./export.sh` or equivalent
-# esp-idf has a Python virtualenv, install nanopb's dependencies in it
-$ pip3 install protobuf grpcio-tools
-# update submodules after each code pull to avoid build errors
-$ git submodule update --init --recursive
+# esp-idf has a Python virtualenv
 # navigate to the targets/esp32 directory
 $ cd targets/esp32
 # run once after pulling the repo

@@ -4,7 +4,7 @@
 #include <functional>
 #include <mutex>
 #include <queue>
-#include <tao/json/value.hpp>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -27,7 +27,7 @@ class EventLoop : public bell::Task {
 
   // Define all possible event payload types
   using EventPayload =
-      std::variant<tao::json::value, std::monostate, CurrentTrackMetadata>;
+      std::variant<std::string, std::monostate, CurrentTrackMetadata>;
 
   struct Event {
     EventType type;

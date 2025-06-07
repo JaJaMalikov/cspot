@@ -3,8 +3,7 @@
 // Library includes
 #include <bell/http/Client.h>
 #include <mutex>
-#include <tao/json.hpp>
-#include <tao/json/contrib/traits.hpp>
+#include <cJSON.h>
 #include "bell/Logger.h"
 
 // Own includes
@@ -110,7 +109,7 @@ bell::Result<> CredentialsResolver::updateAddresses() {
   std::scoped_lock lock(this->accessMutex);
 
   // Fetch new addresses
-  auto request = bell::http::request(bell::HTTPMethod::GET, apResolveUrl);
+  auto request = bell::http::request(bell::http::Method::GET, apResolveUrl);
   if (!request) {
     return request.getError();
   }
@@ -202,7 +201,7 @@ bell::Result<> CredentialsResolver::updateAccessKey() {
   std::string clientToken = tokenRes.getValue();
 
   auto httpConnectionResponse = bell::http::requestWithBody(
-      bell::HTTPMethod::POST, "https://login5.spotify.com/v3/login",
+      bell::http::Method::POST, "https://login5.spotify.com/v3/login",
       {{"Accept", "application/x-protobuf"},
        {
            "Content-Type",
@@ -298,7 +297,7 @@ bell::Result<> CredentialsResolver::updateClientToken() {
   }
 
   auto httpConnectionResponse = bell::http::requestWithBody(
-      bell::HTTPMethod::POST, "https://clienttoken.spotify.com/v1/clienttoken",
+      bell::http::Method::POST, "https://clienttoken.spotify.com/v1/clienttoken",
       {{"Accept", "application/x-protobuf"},
        {
            "Content-Type",

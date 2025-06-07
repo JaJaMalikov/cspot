@@ -5,6 +5,7 @@
 #include "TrackProvider.h"
 #include "bell/Result.h"
 #include "connect.pb.h"
+#include <cJSON.h>
 
 #include "SessionContext.h"
 #include "api/SpClient.h"
@@ -16,7 +17,7 @@ class ConnectStateHandler {
   ConnectStateHandler(std::shared_ptr<SessionContext> sessionContext,
                       std::shared_ptr<SpClient> spClient);
 
-  bell::Result<> handlePlayerCommand(tao::json::value& messageJson);
+  bell::Result<> handlePlayerCommand(cJSON* messageJson);
 
   bell::Result<> putState(
       PutStateReason reason = PutStateReason_PLAYER_STATE_CHANGED);
@@ -35,7 +36,7 @@ class ConnectStateHandler {
   void initialize();
 
   bell::Result<> handleTransferCommand(std::string_view payloadDataStr,
-                                       const tao::json::value& options);
+                                       cJSON* options);
 
   bell::Result<> handleSkipNextCommand();
 };

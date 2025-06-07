@@ -8,7 +8,7 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/base64.h>
 #include <mbedtls/pkcs5.h>
-#include <tao/json.hpp>
+#include <cJSON.h>
 #include "bell/net/URIParser.h"
 
 using namespace cspot;
@@ -53,30 +53,35 @@ bool LoginBlob::isAuthenticated() {
 std::string LoginBlob::buildZeroconfJSONResponse() {
   std::scoped_lock lock(accessMutex);
 
-  tao::json::value obj;
-  obj["status"] = 101;
-  obj["statusString"] = "OK";
-  obj["version"] = protocolVersion;
-  obj["spotifyError"] = 0;
-  obj["libraryVersion"] = swVersion;
-  obj["accountReq"] = "PREMIUM";
-  obj["brandDisplayName"] = brandName;
-  obj["modelDisplayName"] = brandName;
-  obj["voiceSupport"] = "NO";
-  obj["productID"] = 0;
-  obj["tokenType"] = "default";
-  obj["groupStatus"] = "NONE";
-  obj["resolverVersion"] = "0";
-  obj["scope"] = "streaming,client-authorization-universal";
-  obj["deviceType"] = deviceType;
-  obj["availability"] = "";
+  cJSON* root = cJSON_CreateObject();
+  cJSON_AddNumberToObject(root, "status", 101);
+  cJSON_AddStringToObject(root, "statusString", "OK");
+  cJSON_AddStringToObject(root, "version", protocolVersion.c_str());
+  cJSON_AddNumberToObject(root, "spotifyError", 0);
+  cJSON_AddStringToObject(root, "libraryVersion", swVersion.c_str());
+  cJSON_AddStringToObject(root, "accountReq", "PREMIUM");
+  cJSON_AddStringToObject(root, "brandDisplayName", brandName.c_str());
+  cJSON_AddStringToObject(root, "modelDisplayName", brandName.c_str());
+  cJSON_AddStringToObject(root, "voiceSupport", "NO");
+  cJSON_AddNumberToObject(root, "productID", 0);
+  cJSON_AddStringToObject(root, "tokenType", "default");
+  cJSON_AddStringToObject(root, "groupStatus", "NONE");
+  cJSON_AddStringToObject(root, "resolverVersion", "0");
+  cJSON_AddStringToObject(root, "scope",
+                          "streaming,client-authorization-universal");
+  cJSON_AddStringToObject(root, "deviceType", deviceType.c_str());
+  cJSON_AddStringToObject(root, "availability", "");
 
-  obj["deviceID"] = deviceId;
-  obj["remoteName"] = deviceName;
-  obj["publicKey"] = dhPublicKey;
-  obj["activeUser"] = username;
+  cJSON_AddStringToObject(root, "deviceID", deviceId.c_str());
+  cJSON_AddStringToObject(root, "remoteName", deviceName.c_str());
+  cJSON_AddStringToObject(root, "publicKey", dhPublicKey.c_str());
+  cJSON_AddStringToObject(root, "activeUser", username.c_str());
 
-  return tao::json::to_string(obj);
+  char* str = cJSON_PrintUnformatted(root);
+  std::string out(str);
+  free(str);
+  cJSON_Delete(root);
+  return out;
 }
 
 bell::Result<> LoginBlob::authenticateZeroconfString(
