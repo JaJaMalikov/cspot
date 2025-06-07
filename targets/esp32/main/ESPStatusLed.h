@@ -29,7 +29,7 @@ public:
 private:
     StatusLed status = IDLE;
 #ifdef CONFIG_CSPOT_STATUS_LED_TYPE_RMT
-    led_strip_t* pStrip_a;
+    led_strip_handle_t strip;
 #endif
 };
 
